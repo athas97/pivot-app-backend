@@ -39,6 +39,9 @@ class ActivityController extends Controller
 
     public function export()
     {
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
         $columns = [
             'id' => 'ID',
             'hobby_name' => 'Category Name',
@@ -83,7 +86,6 @@ class ActivityController extends Controller
                         $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                     }
 
-                    // Write as text so activity content beginning with "=" is never treated as a formula.
                     $sheet->setCellValueExplicit(
                         Coordinate::stringFromColumnIndex($index + 1) . $row,
                         $value === null ? '' : (string) $value,
@@ -97,18 +99,17 @@ class ActivityController extends Controller
 
         $sheet->freezePane('A2');
         $sheet->getStyle('1:1')->getFont()->setBold(true);
-        foreach (range(1, count($columns)) as $column) {
-            $sheet->getColumnDimensionByColumn($column)->setAutoSize(true);
-        }
 
         $filename = 'activities-' . now()->format('Y-m-d-His') . '.xlsx';
+        $tempPath = storage_path('app/public/' . $filename);
 
-        return response()->streamDownload(function () use ($spreadsheet) {
-            (new Xlsx($spreadsheet))->save('php://output');
-            $spreadsheet->disconnectWorksheets();
-        }, $filename, [
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempPath);
+        $spreadsheet->disconnectWorksheets();
+
+        return response()->download($tempPath, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ]);
+        ])->deleteFileAfterSend(true);
     }
 
     public function show($id)
