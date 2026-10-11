@@ -17,9 +17,6 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
         <h3 style="font-size: 1.125rem; font-weight: 700;">Activities List</h3>
         <div style="display: flex; gap: 0.75rem;">
-            <a href="{{ route('admin.activities.export') }}" class="btn btn-secondary">
-                <i class="fa-solid fa-file-excel"></i> Export All to Excel
-            </a>
             <button onclick="openModal('create-activity-modal')" class="btn btn-primary">
                 <i class="fa-solid fa-plus"></i> Add Activity
             </button>
