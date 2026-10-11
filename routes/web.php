@@ -64,6 +64,7 @@ Route::prefix('dashboard')->name('admin.')->group(function () {
         Route::resource('user-profiles', UserProfileController::class)->only(['index', 'show', 'update', 'destroy']);
 
         // Activities
+        Route::get('activities/export', [ActivityController::class, 'export'])->name('activities.export');
         Route::resource('activities', ActivityController::class);
 
         // Categories
