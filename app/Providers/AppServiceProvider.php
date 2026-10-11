@@ -77,6 +77,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ChallengePackRepositoryInterface::class, ChallengePackRepository::class);
         $this->app->bind(GroupChallengeSessionRepositoryInterface::class, GroupChallengeSessionRepository::class);
         $this->app->bind(EventRepositoryInterface::class, EventRepository::class);
+        $this->app->bind(StreakLogsRepositoryInterface::class, StreakLogsRepository::class);
     }
 
     /**
