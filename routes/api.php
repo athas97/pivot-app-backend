@@ -30,6 +30,8 @@ use App\Http\Controllers\GroupChallengeController;
 use App\Http\Controllers\GroupChallengeSessionController;
 use App\Http\Controllers\PromoCodeController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\V1\MembershipController;
+use App\Http\Controllers\Api\V1\ChallengeReservationController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -60,6 +62,21 @@ Route::prefix('v1')->group(function () {
     Route::get('leaderboard/emotion', [EmotionLogsController::class, 'counts']);
 
     Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/access', [MembershipController::class, 'access']);
+        Route::post('/trial-checkouts', [MembershipController::class, 'trialCheckout']);
+        Route::post('/trials/start', [MembershipController::class, 'startTrial']);
+        Route::get('/access/categories', [MembershipController::class, 'categories']);
+        Route::put('/access/categories', [MembershipController::class, 'updateCategories']);
+        Route::post('/access/announcements/acknowledge', [MembershipController::class, 'acknowledge']);
+        Route::post('/access/reconcile', [MembershipController::class, 'reconcile']);
+        Route::post('/membership/purchase-checkouts', [MembershipController::class, 'purchaseCheckout']);
+        Route::post('/membership/change-checkouts', [MembershipController::class, 'changeCheckout']);
+        Route::post('/membership/attempt-status', [MembershipController::class, 'attemptStatus']);
+        Route::post('/challenge-reservations', [ChallengeReservationController::class, 'reserve']);
+        Route::post('/challenge-reservations/{reservationId}/resume', [ChallengeReservationController::class, 'resume']);
+        Route::post('/challenge-reservations/{reservationId}/complete', [ChallengeReservationController::class, 'complete']);
+        Route::post('/challenge-reservations/{reservationId}/abandon', [ChallengeReservationController::class, 'abandon']);
+
         Route::post('promo-codes/validate', [PromoCodeController::class, 'validateCode']);
         Route::post('promo-codes/confirm', [PromoCodeController::class, 'confirm']);
 

@@ -15,6 +15,8 @@ class RevenueCatWebhookRequest extends FormRequest
         'PRODUCT_CHANGE',
         'BILLING_ISSUE',
         'NON_RENEWING_PURCHASE',
+        'REFUND',
+        'TRANSFER',
     ];
 
     private const SUPPORTED_IOS_TIER_PRODUCTS = [
@@ -29,6 +31,14 @@ class RevenueCatWebhookRequest extends FormRequest
         'tier_3',
         'tier_2_android',
         'tier_3_android',
+        'standard_android',
+        'standard_lifetime_android',
+        'premium_android',
+        'premium_lifetime_android',
+        'tier_2_annual',
+        'tier_2_lifetime',
+        'tier_3_annual',
+        'tier_3_lifetime',
     ];
 
     protected function prepareForValidation(): void
@@ -49,6 +59,7 @@ class RevenueCatWebhookRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'id' => ['required', 'string', 'max:255'],
             'app_user_id' => ['required', 'string'],
             'original_app_user_id' => ['nullable', 'string'],
             'aliases' => ['nullable', 'array'],
@@ -108,6 +119,12 @@ class RevenueCatWebhookRequest extends FormRequest
             'purchased_at_ms' => ['nullable', 'numeric'],
             'expiration_at_ms' => ['nullable', 'numeric'],
             'event_timestamp_ms' => ['nullable', 'numeric'],
+            'transaction_id' => ['nullable', 'string', 'max:255'],
+            'original_transaction_id' => ['nullable', 'string', 'max:255'],
+            'base_plan_id' => ['nullable', 'string', 'max:100'],
+            'period_type' => ['nullable', 'string', 'max:50'],
+            'auto_renew' => ['nullable', 'boolean'],
+            'cancel_reason' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

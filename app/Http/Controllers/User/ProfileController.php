@@ -10,6 +10,8 @@ use App\Http\Resources\UserProfileResource;
 use App\Models\Country;
 use App\Models\Hobby;
 use App\Models\UserProfile;
+use App\Models\Tier;
+use App\Services\Membership\MembershipAccessService;
 use App\Services\ProfileService;
 use App\Services\UserHobbyService;
 use Illuminate\Http\Request;
@@ -85,12 +87,16 @@ class ProfileController extends Controller
     public function me(Request $request)
     {
         $user = $request->user()->loadMissing('subscription.tier');
-        $userTier = $user->subscription?->tier
-            ? [
-                'id' => $user->subscription->tier->id,
-                'name' => $user->subscription->tier->name,
-            ]
-            : null;
+        $membership = app(MembershipAccessService::class)->snapshot($user);
+        $tierName = match ($membership['effective_package']) {
+            'standard' => '2',
+            'premium' => '3',
+            default => '1',
+        };
+        $userTier = [
+            'id' => (int) (Tier::query()->where('name', $tierName)->value('id') ?? $tierName),
+            'name' => $tierName,
+        ];
 
         try {
             $profile = $this->profileService->getByUserId($user->id);
@@ -103,7 +109,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'user' => new UserResource($user),
-            // 'user_tier' => $userTier,
+            'user_tier' => $userTier,
             'profile' => new UserProfileResource($profile),
         ]);
     }
