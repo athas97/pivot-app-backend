@@ -55,6 +55,84 @@ class RevenueCatService
         return $response->json();
     }
 
+    /** Fetch a complete, environment-scoped customer collection without treating API failure as an empty result. */
+    public function fetchCustomerMembershipState(string $customerId, string $environment): array
+    {
+        if ($this->apiKey === '' || $this->projectId === '' || ! in_array($environment, ['production', 'sandbox'], true)) {
+            return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => 'RevenueCat is not configured for reconciliation.'];
+        }
+
+        try {
+            $subscriptions = $this->fetchCustomerCollection($customerId, 'subscriptions', $environment);
+            if (! $subscriptions['ok']) return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => $subscriptions['error']];
+
+            $purchases = $this->fetchCustomerCollection($customerId, 'purchases', $environment);
+            if (! $purchases['ok']) return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => $purchases['error']];
+
+            return ['ok' => true, 'subscriptions' => $subscriptions['items'], 'purchases' => $purchases['items']];
+        } catch (Throwable $exception) {
+            Log::warning('RevenueCat membership reconciliation request failed.', [
+                'resource' => 'customer_membership',
+                'customer_id' => $customerId,
+                'exception' => $exception::class,
+            ]);
+
+            return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => 'RevenueCat could not verify current purchases.'];
+        }
+    }
+
+    private function fetchCustomerCollection(string $customerId, string $resource, string $environment): array
+    {
+        $items = [];
+        $startingAfter = null;
+        $seenCursors = [];
+        $endpoint = "{$this->baseUrl}/projects/{$this->projectId}/customers/" . rawurlencode($customerId) . "/{$resource}";
+
+        for ($page = 0; $page < 20; $page++) {
+            $query = ['environment' => $environment, 'limit' => 100];
+            if ($startingAfter) $query['starting_after'] = $startingAfter;
+            $response = Http::connectTimeout(3)->timeout(8)->withHeaders($this->headers())->get($endpoint, $query);
+            if ($response->failed()) {
+                Log::warning('RevenueCat membership reconciliation request failed.', [
+                    'resource' => $resource, 'status' => $response->status(), 'customer_id' => $customerId,
+                ]);
+                return ['ok' => false, 'items' => [], 'error' => 'RevenueCat could not verify current purchases.'];
+            }
+            $body = $response->json();
+            if (! is_array($body) || ! is_array($body['items'] ?? null)) {
+                Log::warning('RevenueCat membership reconciliation returned an invalid response.', [
+                    'resource' => $resource,
+                    'customer_id' => $customerId,
+                ]);
+                return ['ok' => false, 'items' => [], 'error' => 'RevenueCat returned an invalid membership response.'];
+            }
+            foreach ($body['items'] as $item) {
+                if (! is_array($item)) {
+                    Log::warning('RevenueCat membership reconciliation returned an invalid record.', [
+                        'resource' => $resource,
+                        'customer_id' => $customerId,
+                    ]);
+                    return ['ok' => false, 'items' => [], 'error' => 'RevenueCat returned an invalid membership response.'];
+                }
+            }
+            array_push($items, ...$body['items']);
+            $next = $body['next_page'] ?? null;
+            if ($next === null || $next === '') return ['ok' => true, 'items' => $items];
+            if (! is_string($next)) {
+                return ['ok' => false, 'items' => [], 'error' => 'RevenueCat returned an invalid pagination cursor.'];
+            }
+            parse_str((string) parse_url($next, PHP_URL_QUERY), $nextQuery);
+            $nextCursor = $nextQuery['starting_after'] ?? null;
+            if (! is_string($nextCursor) || $nextCursor === '' || isset($seenCursors[$nextCursor])) {
+                return ['ok' => false, 'items' => [], 'error' => 'RevenueCat returned an invalid pagination cursor.'];
+            }
+            $seenCursors[$nextCursor] = true;
+            $startingAfter = $nextCursor;
+        }
+
+        return ['ok' => false, 'items' => [], 'error' => 'RevenueCat returned too many membership records to reconcile safely.'];
+    }
+
     public function getMetricsOverview(): array
     {
         try {
