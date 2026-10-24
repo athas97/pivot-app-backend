@@ -228,6 +228,7 @@ class MembershipReconciliationService
 
     private function storeIdentifiers(array $item): array
     {
+        if (! empty($item['store_product_id']) && is_string($item['store_product_id'])) return [$item['store_product_id']];
         if (! empty($item['product_id']) && is_string($item['product_id'])) return [$item['product_id']];
         $identifiers = [];
         $entitlements = $item['entitlements']['items'] ?? [];

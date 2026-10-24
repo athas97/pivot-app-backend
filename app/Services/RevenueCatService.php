@@ -69,7 +69,13 @@ class RevenueCatService
             $purchases = $this->fetchCustomerCollection($customerId, 'purchases', $environment);
             if (! $purchases['ok']) return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => $purchases['error']];
 
-            return ['ok' => true, 'subscriptions' => $subscriptions['items'], 'purchases' => $purchases['items']];
+            // V2 product_id is a RevenueCat catalog ID, not the store SKU. Resolve it
+            // through product metadata before membership code compares store identities.
+            $products = [];
+            $subscriptionItems = $this->resolveMembershipStoreProducts($subscriptions['items'], $products);
+            $purchaseItems = $this->resolveMembershipStoreProducts($purchases['items'], $products);
+
+            return ['ok' => true, 'subscriptions' => $subscriptionItems, 'purchases' => $purchaseItems];
         } catch (Throwable $exception) {
             Log::warning('RevenueCat membership reconciliation request failed.', [
                 'resource' => 'customer_membership',
@@ -79,6 +85,32 @@ class RevenueCatService
 
             return ['ok' => false, 'subscriptions' => [], 'purchases' => [], 'error' => 'RevenueCat could not verify current purchases.'];
         }
+    }
+
+    private function resolveMembershipStoreProducts(array $items, array &$products): array
+    {
+        foreach ($items as &$item) {
+            $productId = $item['product_id'] ?? null;
+            if (! is_string($productId) || ! str_starts_with($productId, 'prod')) continue;
+
+            if (! array_key_exists($productId, $products)) {
+                $endpoint = "{$this->baseUrl}/projects/{$this->projectId}/products/" . rawurlencode($productId);
+                $response = Http::connectTimeout(3)->timeout(8)->withHeaders($this->headers())->get($endpoint);
+                $product = $response->json();
+                if (! $response->successful() || ! is_array($product)
+                    || ($product['id'] ?? null) !== $productId
+                    || ! is_string($product['store_identifier'] ?? null)
+                    || trim($product['store_identifier']) === '') {
+                    // An incomplete verification must not retire a customer's existing access.
+                    throw new \RuntimeException('RevenueCat membership product could not be verified.');
+                }
+                $products[$productId] = $product['store_identifier'];
+            }
+            $item['store_product_id'] = $products[$productId];
+        }
+        unset($item);
+
+        return $items;
     }
 
     private function fetchCustomerCollection(string $customerId, string $resource, string $environment): array
