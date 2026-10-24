@@ -42,6 +42,11 @@ class MembershipReconciliationService
                 throw new RuntimeException('Membership changed during reconciliation. Retry to verify the latest purchase state.');
             }
             $this->applyState($user, $state, $environment);
+            // Do not release a trial while an unrecognized subscription still needs mapping.
+            $unmapped = collect($state['subscriptions'])->contains(fn ($item) =>
+                ($item['environment'] ?? null) === $environment
+                && ! $this->catalog->resolve($this->storeIdentifiers($item), $item['base_plan_id'] ?? null, null));
+            if (! $unmapped) app(MembershipTrialReservation::class)->releaseExpiredAfterVerification($user->id);
         });
     }
 
@@ -115,6 +120,9 @@ class MembershipReconciliationService
             return null;
         }
         $package = $choice['package'];
+        // A verified purchase may arrive after its trial has renewed or expired.
+        // Settle that checkout before access checks, without granting expired access.
+        $trialAttempt = $this->settleVerifiedTrialCheckout($user, $item, $choice);
         if (($item['gives_access'] ?? null) !== true) {
             $this->recordSubscription($user, $item, $choice, $package, $environment, false);
             return null;
@@ -137,21 +145,12 @@ class MembershipReconciliationService
         $selected = $package;
         $effective = $package;
         if ($isTrial) {
-            $attempt = $this->matchingAttempt($user, 'trial', $choice);
+            $attempt = $trialAttempt;
             if ($attempt) {
                 $quote = json_decode($attempt->quote, true) ?: [];
                 $selected = $quote['selected_package'] ?? $package;
                 $effective = $quote['trial_access_package'] ?? $package;
-                $transactionId = $item['store_subscription_identifier'] ?? $item['original_transaction_id'] ?? null;
-                if ($transactionId) {
-                    $this->attemptStatus->transition((int) $attempt->id, 'completed', (string) $transactionId, 'verified_revenuecat_trial');
-                }
             }
-            DB::table('membership_trials')->updateOrInsert(['user_id' => $user->id], [
-                'status' => 'consumed', 'started_at' => now(), 'ends_at' => $periodEnd,
-                'source' => 'store', 'transaction_id' => $item['store_subscription_identifier'] ?? $item['original_transaction_id'] ?? null,
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
         } else {
             $this->completeMatchingPurchaseAttempt(
                 $user,
@@ -245,6 +244,30 @@ class MembershipReconciliationService
             }
         }
         return array_values(array_unique(array_map('strval', $identifiers)));
+    }
+
+    private function settleVerifiedTrialCheckout(Users $user, array $item, array $choice): ?object
+    {
+        $transactionId = $item['store_subscription_identifier'] ?? $item['original_transaction_id'] ?? null;
+        if (! is_string($transactionId) || $transactionId === '') return null;
+        $attempt = $this->matchingAttempt($user, 'trial', $choice);
+        $isTrial = ($item['status'] ?? null) === 'trialing';
+        if (! $attempt && ! $isTrial) return null;
+
+        if ($attempt) {
+            $this->attemptStatus->transition((int) $attempt->id, 'completed', $transactionId, 'verified_revenuecat_trial');
+        }
+        $trialEnd = $isTrial
+            ? $this->milliseconds($item['current_period_ends_at'] ?? $item['ends_at'] ?? null)
+            : $this->milliseconds($item['current_period_starts_at'] ?? null);
+        DB::table('membership_trials')->updateOrInsert(['user_id' => $user->id], [
+            'status' => 'consumed', 'started_at' => $this->milliseconds($item['starts_at'] ?? null) ?? now(),
+            'ends_at' => $trialEnd ?? now(), 'source' => 'store', 'transaction_id' => $transactionId,
+            'reserved_at' => null, 'reservation_expires_at' => null,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $attempt;
     }
 
     private function matchingAttempt(Users $user, string $operation, array $choice): ?object

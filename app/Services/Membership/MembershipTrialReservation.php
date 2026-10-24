@@ -10,6 +10,18 @@ class MembershipTrialReservation
 {
     public function __construct(private readonly MembershipProductCatalog $catalog) {}
 
+    /** Called only under the user lock after a complete, successful store reconciliation. */
+    public function releaseExpiredAfterVerification(int $userId): void
+    {
+        $trial = DB::table('membership_trials')->where('user_id', $userId)->lockForUpdate()->first();
+        if ($trial?->status !== 'reserved'
+            || ($trial->reservation_expires_at && now()->lessThan($trial->reservation_expires_at))) return;
+
+        DB::table('membership_trials')->where('user_id', $userId)->where('status', 'reserved')->update([
+            'status' => 'eligible', 'reserved_at' => null, 'reservation_expires_at' => null, 'updated_at' => now(),
+        ]);
+    }
+
     public function forUser(int $userId, ?object $trial): ?array
     {
         if ($trial?->status !== 'reserved') return null;
