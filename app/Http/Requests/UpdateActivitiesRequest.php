@@ -30,7 +30,7 @@ class UpdateActivitiesRequest extends FormRequest
     {
         return [
             'user_id' => 'required|integer|exists:users,id',
-            'activities' => 'required|array|min:1',
+            'activities' => 'present|array',
             'activities.*' => 'required|string|exists:hobbies,name|distinct',
         ];
     }
@@ -41,9 +41,8 @@ class UpdateActivitiesRequest extends FormRequest
             'user_id.required' => 'User ID is required.',
             'user_id.integer' => 'User ID must be an integer.',
             'user_id.exists' => 'The specified user does not exist.',
-            'activities.required' => 'Activities is required.',
+            'activities.present' => 'Activities must be provided; use an empty array to clear interests.',
             'activities.array' => 'Activities must be an array or a comma separated string.',
-            'activities.min' => 'At least one activity is required.',
             'activities.*.exists' => 'One or more activities are invalid.',
             'activities.*.distinct' => 'Duplicate activities are not allowed.',
         ];

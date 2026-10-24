@@ -5,6 +5,13 @@ namespace App\Services\Membership;
 class MembershipProductCatalog
 {
     private const PRODUCTS = [
+        'standard_android_monthly:standard-android-monthly' => ['standard', 'monthly', 'standard_android_monthly', 'standard-android-monthly'],
+        'standard_android_annual:standard-android-annual' => ['standard', 'annual', 'standard_android_annual', 'standard-android-annual'],
+        'standard_android_lifetime' => ['standard', 'lifetime', 'standard_android_lifetime'],
+        'premium_android_monthly:premium-android-monthly' => ['premium', 'monthly', 'premium_android_monthly', 'premium-android-monthly'],
+        'premium_android_annual:premium-android-annual' => ['premium', 'annual', 'premium_android_annual', 'premium-android-annual'],
+        'premium_android_lifetime' => ['premium', 'lifetime', 'premium_android_lifetime'],
+        // Historical identities remain valid for existing purchases, not new checkout quotes.
         'standard_android:monthly' => ['standard', 'monthly', 'standard_android'],
         'standard_android:annual' => ['standard', 'annual', 'standard_android'],
         'premium_android:monthly' => ['premium', 'monthly', 'premium_android'],
@@ -29,6 +36,20 @@ class MembershipProductCatalog
         'tier_3_lifetime' => ['premium', 'lifetime', 'tier_3_lifetime'],
     ];
 
+    public function checkoutProduct(string $package, string $path): array
+    {
+        if (! in_array($package, ['standard', 'premium'], true)
+            || ! in_array($path, ['monthly', 'annual', 'lifetime'], true)) {
+            throw new \InvalidArgumentException('Unknown membership choice.');
+        }
+
+        return $this->resolve(
+            [$package . '_android_' . $path],
+            $path === 'lifetime' ? null : $package . '-android-' . $path,
+            $package,
+        );
+    }
+
     public function resolve(array $identifiers, ?string $basePlan, ?string $packageHint): ?array
     {
         $matches = [];
@@ -37,17 +58,21 @@ class MembershipProductCatalog
             if (! is_string($identifier) || $identifier === '') continue;
             $identifier = strtolower(trim($identifier));
 
-            foreach (self::PRODUCTS as $catalogId => [$package, $path, $storeProduct]) {
+            foreach (self::PRODUCTS as $catalogId => $definition) {
+                [$package, $path, $storeProduct, $configuredBasePlan] = array_pad($definition, 4, null);
                 if ($identifier !== $catalogId && $identifier !== $storeProduct) continue;
-                if ($basePlan !== null && $basePlan !== '' && ! $this->basePlanMatches($path, $storeProduct, $basePlan)) continue;
+                if ($basePlan !== null && $basePlan !== '' && ($configuredBasePlan !== null
+                    ? strtolower($basePlan) !== $configuredBasePlan
+                    : ! $this->basePlanMatches($path, $storeProduct, $basePlan))) continue;
                 if ($packageHint !== null && $packageHint !== $package) continue;
+                $resolvedBasePlan = $path === 'lifetime' ? null : ($configuredBasePlan ?? $path);
 
                 $matches[$package . '|' . $path . '|' . $storeProduct] = [
                     'package' => $package,
                     'path' => $path,
-                    'product_id' => $path === 'lifetime' ? $storeProduct : $storeProduct . ':' . $path,
+                    'product_id' => $resolvedBasePlan === null ? $storeProduct : $storeProduct . ':' . $resolvedBasePlan,
                     'store_product_id' => $storeProduct,
-                    'base_plan_id' => $path === 'lifetime' ? null : $path,
+                    'base_plan_id' => $resolvedBasePlan,
                 ];
             }
         }

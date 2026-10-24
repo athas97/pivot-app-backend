@@ -101,8 +101,6 @@ class ActivityRepository implements ActivityRepositoryInterface
             $query->whereHas('hobby', function ($hobbyQuery) use ($categoryNames) {
                 $hobbyQuery->whereIn('name', $categoryNames);
             });
-        } elseif ($user) {
-            $query->whereRaw('1 = 0');
         }
 
         if (!empty($filters['tier'])) {
@@ -180,7 +178,7 @@ class ActivityRepository implements ActivityRepositoryInterface
             ? \App\Models\Hobby::query()->get()
             : ($package === 'standard'
                 ? \App\Models\Hobby::query()->whereIn('id', $selectedIds)->get()
-                : $user->hobbies);
+                : ($user->hobbies->isEmpty() ? \App\Models\Hobby::query()->get() : $user->hobbies));
         if ($excludeMicroMovement) {
             $hobbies = $hobbies->filter(function ($hobby) {
                 return strtolower(trim($hobby->name)) !== 'micro-movement';

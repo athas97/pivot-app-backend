@@ -45,9 +45,7 @@ class ProfileRequest extends FormRequest
                     ->pluck('id')
                     ->toArray();
 
-                if (! empty($hobbyIds)) {
-                    $this->merge(['hobby_ids' => $hobbyIds]);
-                }
+                $this->merge(['hobby_ids' => $hobbyIds]);
             } elseif (is_string($category)) {
                 $categoryNames = array_filter(array_map('trim', explode(',', $category)));
 
@@ -118,7 +116,7 @@ class ProfileRequest extends FormRequest
             'birth_year' => ($isCreate ? 'required' : 'sometimes') . '|integer|min:1900|max:' . date('Y'),
             'set_your_goal' => ($isCreate ? 'required' : 'sometimes') . '|numeric|min:1|max:168',
             'weekly_goal_minutes' => 'sometimes|integer|min:60|max:10080',
-            'category' => 'sometimes|array|min:5',
+            'category' => 'sometimes|array',
             'category.*' => 'string|exists:hobbies,name',
             'hobby_ids' => 'sometimes|array',
             'hobby_ids.*' => 'integer|exists:hobbies,id',

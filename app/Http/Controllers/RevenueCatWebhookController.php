@@ -309,7 +309,7 @@ class RevenueCatWebhookController extends Controller
             ->latest('created_at')->get() as $attempt) {
             $quote = json_decode($attempt->quote, true) ?: [];
             if (($quote['product_id'] ?? null) === $choice['store_product_id']
-                && ($quote['base_plan_id'] ?? null) === $choice['path']) $matches[] = $attempt;
+                && ($quote['base_plan_id'] ?? null) === $choice['base_plan_id']) $matches[] = $attempt;
         }
 
         return count($matches) === 1 ? $matches[0] : null;

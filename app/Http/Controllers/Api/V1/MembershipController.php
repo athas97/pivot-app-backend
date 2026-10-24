@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hobby;
-use App\Models\User;
+use App\Models\Users;
 use App\Services\Membership\MembershipAccessService;
+use App\Services\Membership\MembershipProductCatalog;
 use App\Services\Membership\MembershipReconciliationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -15,7 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class MembershipController extends Controller
 {
-    public function __construct(private readonly MembershipAccessService $access) {}
+    public function __construct(
+        private readonly MembershipAccessService $access,
+        private readonly MembershipProductCatalog $catalog,
+    ) {}
 
     public function access(Request $request)
     {
@@ -40,12 +44,12 @@ class MembershipController extends Controller
         if ($trial && $trial->status !== 'eligible') {
             return response()->json(['message' => 'The account trial is not available.'], 409);
         }
-        $product = $data['selected_package'] . '_android';
+        $product = $this->catalog->checkoutProduct($data['selected_package'], $data['payment_path']);
         $offer = $data['payment_path'] === 'monthly' ? 'trial-7d-monthly' : 'trial-7d-annual';
 
         return $this->createAttempt($request, 'trial', $data, [
-            'product_id' => $product,
-            'base_plan_id' => $data['payment_path'],
+            'product_id' => $product['store_product_id'],
+            'base_plan_id' => $product['base_plan_id'],
             'offer_id' => $offer,
             'trial_access_package' => config('membership.full_trial_premium', true) ? 'premium' : $data['selected_package'],
         ], function () use ($user) {
@@ -72,7 +76,7 @@ class MembershipController extends Controller
         $fingerprint = hash('sha256', json_encode($data));
         try {
             DB::transaction(function () use ($user, $key, $data, $fingerprint) {
-                $user = User::query()->lockForUpdate()->findOrFail($user->id);
+                $user = Users::query()->lockForUpdate()->findOrFail($user->id);
                 $existing = DB::table('membership_attempts')->where('user_id', $user->id)->where('operation', 'lifetime_trial')->where('idempotency_key', $key)->first();
                 if ($existing) {
                     if ($existing->request_fingerprint !== $fingerprint) throw ValidationException::withMessages(['Idempotency-Key' => 'This key was already used with a different request.']);
@@ -174,8 +178,8 @@ class MembershipController extends Controller
             && now()->lessThan($trial->reservation_expires_at)) {
             return response()->json(['message' => 'Resolve the pending trial checkout before starting another purchase.'], 409);
         }
-        $product = $data['selected_package'] . ($data['payment_path'] === 'lifetime' ? '_lifetime_android' : '_android');
-        return $this->createAttempt($request, 'purchase', $data, ['product_id' => $product, 'base_plan_id' => $data['payment_path'] === 'lifetime' ? null : $data['payment_path'], 'offer_id' => null, 'trial_access_package' => null]);
+        $product = $this->catalog->checkoutProduct($data['selected_package'], $data['payment_path']);
+        return $this->createAttempt($request, 'purchase', $data, ['product_id' => $product['store_product_id'], 'base_plan_id' => $product['base_plan_id'], 'offer_id' => null, 'trial_access_package' => null]);
     }
 
     public function changeCheckout(Request $request)
@@ -194,7 +198,10 @@ class MembershipController extends Controller
         if ($snapshot['access_status'] === 'trial') return response()->json(['message' => 'Trial replacement is not supported.'], 409);
         if ($snapshot['access_source'] !== 'store') return response()->json(['message' => 'Reconcile the current store purchase before quoting a change.'], 409);
         $sourceProduct = explode(':', $snapshot['product_id'])[0];
-        $sourcePlan = $snapshot['payment_path'] === 'lifetime' ? null : $snapshot['payment_path'];
+        $sourceChoice = $this->catalog->resolve([$snapshot['product_id']], null, $snapshot['selected_package'])
+            ?? $this->catalog->resolve([$snapshot['product_id']], $snapshot['payment_path'], $snapshot['selected_package']);
+        if (! $sourceChoice) return response()->json(['message' => 'The current store product could not be mapped. Reconcile access and retry.'], 409);
+        $sourcePlan = $sourceChoice['base_plan_id'];
         $sourcePurchase = DB::table('verified_purchases')->where('user_id', $request->user()->id)
             ->where('environment', config('membership.store_environment', 'production'))
             ->where('product_id', $sourceProduct)
@@ -204,7 +211,7 @@ class MembershipController extends Controller
             ->where(function ($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); })
             ->exists();
         if (! $sourcePurchase) return response()->json(['message' => 'The current store purchase could not be verified. Reconcile access and retry.'], 409);
-        $targetProduct = $data['selected_package'] . ($data['payment_path'] === 'lifetime' ? '_lifetime_android' : '_android');
+        $targetProduct = $this->catalog->checkoutProduct($data['selected_package'], $data['payment_path']);
         $currentPath = $snapshot['payment_path'];
         $mode = $this->replacementMode($snapshot['selected_package'], $currentPath, $data['selected_package'], $data['payment_path']);
         if (! $mode) return response()->json(['message' => 'This membership transition is not supported.'], 422);
@@ -222,7 +229,7 @@ class MembershipController extends Controller
                 ->where(function ($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); })->exists();
             if ($activeRecurring) return response()->json(['message' => 'An active recurring subscription prevents a lifetime upgrade.'], 409);
         }
-        $quote = ['selected_package' => $data['selected_package'], 'payment_path' => $data['payment_path'], 'old_product_id' => $snapshot['product_id'], 'product_id' => $targetProduct, 'base_plan_id' => $data['payment_path'] === 'lifetime' ? null : $data['payment_path'], 'replacement_mode' => $mode, 'renewal_stopped' => $currentPath !== 'lifetime' && $data['payment_path'] === 'lifetime'];
+        $quote = ['selected_package' => $data['selected_package'], 'payment_path' => $data['payment_path'], 'old_product_id' => $snapshot['product_id'], 'product_id' => $targetProduct['store_product_id'], 'base_plan_id' => $targetProduct['base_plan_id'], 'replacement_mode' => $mode, 'renewal_stopped' => $currentPath !== 'lifetime' && $data['payment_path'] === 'lifetime'];
         return $this->createAttempt($request, 'change', $data, $quote);
     }
 
@@ -253,7 +260,7 @@ class MembershipController extends Controller
         return null;
     }
 
-    private function releaseExpiredTrialReservation(User $user, MembershipReconciliationService $reconciliation)
+    private function releaseExpiredTrialReservation(Users $user, MembershipReconciliationService $reconciliation)
     {
         $trial = DB::table('membership_trials')->where('user_id', $user->id)->first();
         if ($trial?->status !== 'reserved' || ! $trial->reservation_expires_at
@@ -266,7 +273,7 @@ class MembershipController extends Controller
         }
 
         DB::transaction(function () use ($user) {
-            User::query()->lockForUpdate()->findOrFail($user->id);
+            Users::query()->lockForUpdate()->findOrFail($user->id);
             $reservation = DB::table('membership_trials')->where('user_id', $user->id)->lockForUpdate()->first();
             if ($reservation?->status === 'reserved' && $reservation->reservation_expires_at
                 && now()->greaterThanOrEqualTo($reservation->reservation_expires_at)) {
@@ -306,7 +313,7 @@ class MembershipController extends Controller
         $response = ['attempt_id' => $attemptId, 'expires_at' => $expiresAt->toISOString(), ...$quote];
         try {
             DB::transaction(function () use ($user, $operation, $key, $fingerprint, $response, $expiresAt, $now, $reserve) {
-                $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+                $lockedUser = Users::query()->lockForUpdate()->findOrFail($user->id);
                 $access = $this->access->snapshot($lockedUser);
                 if ($operation === 'trial' && in_array($access['access_status'], ['active', 'trial'], true)) {
                     abort(409, 'An account with current access cannot enroll in a new trial.');

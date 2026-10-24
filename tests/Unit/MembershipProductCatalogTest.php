@@ -32,4 +32,41 @@ class MembershipProductCatalogTest extends TestCase
         $this->assertSame('lifetime', $choice['path']);
         $this->assertNull($choice['base_plan_id']);
     }
+
+    public function test_checkout_and_recognition_use_all_six_live_revenuecat_identities(): void
+    {
+        $catalog = new MembershipProductCatalog();
+        $products = [
+            ['standard', 'monthly', 'standard_android_monthly', 'standard-android-monthly'],
+            ['standard', 'annual', 'standard_android_annual', 'standard-android-annual'],
+            ['standard', 'lifetime', 'standard_android_lifetime', null],
+            ['premium', 'monthly', 'premium_android_monthly', 'premium-android-monthly'],
+            ['premium', 'annual', 'premium_android_annual', 'premium-android-annual'],
+            ['premium', 'lifetime', 'premium_android_lifetime', null],
+        ];
+
+        foreach ($products as [$package, $path, $product, $basePlan]) {
+            $combined = $basePlan === null ? $product : $product . ':' . $basePlan;
+            $expected = ['package' => $package, 'path' => $path, 'product_id' => $combined,
+                'store_product_id' => $product, 'base_plan_id' => $basePlan];
+            $this->assertSame($expected, $catalog->checkoutProduct($package, $path));
+            $this->assertSame($expected, $catalog->resolve([$product], $basePlan, $package));
+            $this->assertSame($expected, $catalog->resolve([$combined], null, $package));
+            $this->assertSame($expected, $catalog->resolve([$product], null, null));
+            $this->assertNull($catalog->resolve([$product], 'wrong-plan', $package));
+            $this->assertNull($catalog->resolve([$product], $basePlan, $package === 'standard' ? 'premium' : 'standard'));
+        }
+    }
+
+    public function test_current_products_cannot_be_substituted_for_historical_or_ambiguous_products(): void
+    {
+        $catalog = new MembershipProductCatalog();
+        $this->assertNull($catalog->resolve(['standard_android_monthly'], 'monthly', 'standard'));
+        $this->assertNull($catalog->resolve(['standard_android_monthly:monthly'], null, 'standard'));
+        $this->assertNull($catalog->resolve(['standard_android_monthly', 'standard_android_annual'], null, 'standard'));
+        $this->assertSame('standard_android', $catalog->resolve(['standard_android:monthly'], null, 'standard')['store_product_id']);
+        $this->assertSame('standard_android_monthly', $catalog->checkoutProduct('standard', 'monthly')['store_product_id']);
+        $this->expectException(\InvalidArgumentException::class);
+        $catalog->checkoutProduct('unknown', 'monthly');
+    }
 }

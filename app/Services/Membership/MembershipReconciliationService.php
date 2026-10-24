@@ -2,7 +2,7 @@
 
 namespace App\Services\Membership;
 
-use App\Models\User;
+use App\Models\Users;
 use App\Services\RevenueCatService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +17,7 @@ class MembershipReconciliationService
         private readonly MembershipProductCatalog $catalog,
     ) {}
 
-    public function reconcile(User $user): void
+    public function reconcile(Users $user): void
     {
         $environment = strtolower((string) config('membership.store_environment', 'production'));
         $customerId = (string) ($user->revenuecat_user_id ?: $user->id);
@@ -35,7 +35,7 @@ class MembershipReconciliationService
         }
 
         DB::transaction(function () use ($user, $state, $environment, $subscriptionUpdatedAt, $accessUpdatedAt) {
-            User::query()->lockForUpdate()->findOrFail($user->id);
+            Users::query()->lockForUpdate()->findOrFail($user->id);
             $currentSubscriptionUpdatedAt = DB::table('subscriptions')->where('user_id', $user->id)->value('updated_at');
             $currentAccessUpdatedAt = DB::table('account_access')->where('user_id', $user->id)->value('updated_at');
             if ($currentSubscriptionUpdatedAt !== $subscriptionUpdatedAt || $currentAccessUpdatedAt !== $accessUpdatedAt) {
@@ -45,7 +45,7 @@ class MembershipReconciliationService
         });
     }
 
-    private function applyState(User $user, array $state, string $environment): void
+    private function applyState(Users $user, array $state, string $environment): void
     {
         $valid = [];
         foreach ($state['subscriptions'] as $subscription) {
@@ -87,7 +87,7 @@ class MembershipReconciliationService
         $this->cancelExpiredAttempts($user);
     }
 
-    private function subscriptionCandidate(User $user, array $item, string $environment): ?array
+    private function subscriptionCandidate(Users $user, array $item, string $environment): ?array
     {
         if (($item['environment'] ?? null) !== $environment) return null;
         $entitlements = is_array($item['entitlements'] ?? null) ? ($item['entitlements']['items'] ?? []) : [];
@@ -174,7 +174,7 @@ class MembershipReconciliationService
         ];
     }
 
-    private function purchaseCandidate(User $user, array $item, string $environment): ?array
+    private function purchaseCandidate(Users $user, array $item, string $environment): ?array
     {
         if (($item['environment'] ?? null) !== $environment || ($item['status'] ?? null) !== 'owned') return null;
         $entitlements = is_array($item['entitlements'] ?? null) ? ($item['entitlements']['items'] ?? []) : [];
@@ -246,18 +246,18 @@ class MembershipReconciliationService
         return array_values(array_unique(array_map('strval', $identifiers)));
     }
 
-    private function matchingAttempt(User $user, string $operation, array $choice): ?object
+    private function matchingAttempt(Users $user, string $operation, array $choice): ?object
     {
         $matches = [];
         foreach (DB::table('membership_attempts')->where('user_id', $user->id)->where('operation', $operation)->whereIn('status', ['pending', 'scheduled', 'cancelled'])->latest('created_at')->get() as $attempt) {
             $quote = json_decode($attempt->quote, true) ?: [];
             if (($quote['product_id'] ?? null) === $choice['store_product_id']
-                && ($quote['base_plan_id'] ?? null) === $choice['path']) $matches[] = $attempt;
+                && ($quote['base_plan_id'] ?? null) === $choice['base_plan_id']) $matches[] = $attempt;
         }
         return count($matches) === 1 ? $matches[0] : null;
     }
 
-    private function completeMatchingPurchaseAttempt(User $user, array $choice, mixed $transactionId): void
+    private function completeMatchingPurchaseAttempt(Users $user, array $choice, mixed $transactionId): void
     {
         if (! is_string($transactionId) || $transactionId === '') return;
         $attempts = [];
@@ -275,21 +275,21 @@ class MembershipReconciliationService
         );
     }
 
-    private function recordSubscription(User $user, array $item, ?array $choice, ?string $package, string $environment, bool $active, ?Carbon $expiresAt = null, ?string $renewalStatus = null): void
+    private function recordSubscription(Users $user, array $item, ?array $choice, ?string $package, string $environment, bool $active, ?Carbon $expiresAt = null, ?string $renewalStatus = null): void
     {
         $transaction = (string) ($item['store_subscription_identifier'] ?? $item['original_transaction_id'] ?? '');
         if ($transaction === '') return;
         $this->upsertPurchase($user, $transaction, $item['product_id'] ?? '', $choice, $package, $environment, $expiresAt ?? $this->milliseconds($item['ends_at'] ?? null), $renewalStatus, $active, $item);
     }
 
-    private function recordPurchase(User $user, array $item, array $choice, string $package, string $environment): void
+    private function recordPurchase(Users $user, array $item, array $choice, string $package, string $environment): void
     {
         $transaction = (string) ($item['store_purchase_identifier'] ?? $item['id'] ?? '');
         if ($transaction === '') return;
         $this->upsertPurchase($user, $transaction, $item['product_id'] ?? '', $choice, $package, $environment, null, null, true, $item);
     }
 
-    private function upsertPurchase(User $user, string $transaction, string $productId, ?array $choice, ?string $package, string $environment, ?Carbon $expiresAt, ?string $renewalStatus, bool $active, array $payload): void
+    private function upsertPurchase(Users $user, string $transaction, string $productId, ?array $choice, ?string $package, string $environment, ?Carbon $expiresAt, ?string $renewalStatus, bool $active, array $payload): void
     {
         DB::table('verified_purchases')->updateOrInsert([
             'store' => $payload['store'] ?? null, 'environment' => $environment, 'transaction_id' => $transaction,
@@ -297,7 +297,7 @@ class MembershipReconciliationService
             'user_id' => $user->id,
             'original_transaction_id' => $payload['original_transaction_id'] ?? $payload['store_subscription_identifier'] ?? null,
             'product_id' => $choice['store_product_id'] ?? $productId,
-            'base_plan_id' => $choice && $choice['path'] !== 'lifetime' ? $choice['path'] : null,
+            'base_plan_id' => $choice['base_plan_id'] ?? null,
             'entitlement' => $package, 'package' => $choice['package'] ?? $package,
             'payment_path' => $choice['path'] ?? null, 'renewal_status' => $renewalStatus,
             'expires_at' => $expiresAt, 'revoked_at' => $active ? null : now(), 'payload' => json_encode($payload),
@@ -305,7 +305,7 @@ class MembershipReconciliationService
         ]);
     }
 
-    private function publish(User $user, array $candidate): void
+    private function publish(Users $user, array $candidate): void
     {
         DB::table('account_access')->updateOrInsert(['user_id' => $user->id], [
             'selected_package' => $candidate['selected_package'], 'effective_package' => $candidate['effective_package'],
@@ -316,7 +316,7 @@ class MembershipReconciliationService
         ]);
     }
 
-    private function syncScheduledChange(User $user, array $subscription): void
+    private function syncScheduledChange(Users $user, array $subscription): void
     {
         $pendingChanges = is_array($subscription['pending_changes'] ?? null) ? $subscription['pending_changes'] : [];
         $pending = is_array($pendingChanges['product'] ?? null) ? $pendingChanges['product'] : [];
@@ -333,13 +333,13 @@ class MembershipReconciliationService
             if (($quote['replacement_mode'] ?? null) === 'DEFERRED'
                 && $target
                 && ($quote['product_id'] ?? null) === $target['store_product_id']
-                && ($quote['base_plan_id'] ?? null) === $target['path']) {
+                && ($quote['base_plan_id'] ?? null) === $target['base_plan_id']) {
                 $this->attemptStatus->transition((int) $attempt->id, 'scheduled', null, 'verified_revenuecat_pending_change');
             }
         }
     }
 
-    private function cancelExpiredAttempts(User $user): void
+    private function cancelExpiredAttempts(Users $user): void
     {
         $attempts = DB::table('membership_attempts')->where('user_id', $user->id)
             ->where('status', 'pending')->whereNotNull('expires_at')->where('expires_at', '<=', now())->get(['id']);

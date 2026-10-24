@@ -27,6 +27,12 @@ class RevenueCatWebhookRequest extends FormRequest
     ];
 
     private const SUPPORTED_ANDROID_TIER_PRODUCTS = [
+        'standard_android_monthly',
+        'standard_android_annual',
+        'standard_android_lifetime',
+        'premium_android_monthly',
+        'premium_android_annual',
+        'premium_android_lifetime',
         'tier_2',
         'tier_3',
         'tier_2_android',

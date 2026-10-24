@@ -117,6 +117,7 @@ class ProfileController extends Controller
     public function update(ProfileRequest $request, UserProfile $profile)
     {
         $validated = $request->validated();
+        $hasHobbySelection = array_key_exists('hobby_ids', $validated);
         $hobbyIds = $validated['hobby_ids'] ?? [];
 
         $userData = [];
@@ -146,7 +147,7 @@ class ProfileController extends Controller
             );
         }
 
-        if (! empty($hobbyIds)) {
+        if ($hasHobbySelection) {
             $profile->loadMissing('user');
             $user = $profile->user;
 

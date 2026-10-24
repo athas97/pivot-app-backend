@@ -86,7 +86,7 @@ class MembershipAccessService
         ];
     }
 
-    public function categories(User $user): array
+    public function categories(User|Users $user): array
     {
         $mandatoryId = Hobby::query()->whereRaw('LOWER(name) = ?', ['micro-movement'])->value('id');
 
