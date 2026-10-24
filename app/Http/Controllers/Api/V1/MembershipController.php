@@ -56,7 +56,7 @@ class MembershipController extends Controller
             return response()->json(['message' => 'The account trial is not available.'], 409);
         }
         $product = $this->catalog->checkoutProduct($data['selected_package'], $data['payment_path']);
-        $offer = $data['payment_path'] === 'monthly' ? 'trial-7d-monthly' : 'trial-7d-annual';
+        $offer = $this->catalog->trialOfferId($data['selected_package'], $data['payment_path']);
 
         return $this->createAttempt($request, 'trial', $data, [
             'product_id' => $product['store_product_id'],

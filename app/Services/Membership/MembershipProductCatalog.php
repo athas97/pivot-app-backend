@@ -50,6 +50,18 @@ class MembershipProductCatalog
         );
     }
 
+    public function trialOfferId(string $package, string $path): ?string
+    {
+        $this->checkoutProduct($package, $path); // Validate the exact supported choice.
+        return match ($package . ':' . $path) {
+            'standard:monthly' => 'free-trial-standard-monthly',
+            'standard:annual' => 'free-trial-annual-standard',
+            'premium:monthly' => 'free-trial-premium-monthly',
+            'premium:annual' => 'free-trial-premium-annual',
+            default => null,
+        };
+    }
+
     public function resolve(array $identifiers, ?string $basePlan, ?string $packageHint): ?array
     {
         $matches = [];

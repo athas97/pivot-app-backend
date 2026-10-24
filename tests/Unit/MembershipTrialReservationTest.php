@@ -21,7 +21,7 @@ class MembershipTrialReservationTest extends TestCase
     {
         return ['attempt_id' => 'existing-attempt', 'expires_at' => now()->addMinutes(5)->toISOString(),
             'product_id' => 'standard_android_monthly', 'base_plan_id' => 'standard-android-monthly',
-            'offer_id' => 'trial-7d-monthly', 'trial_access_package' => 'premium'];
+            'offer_id' => 'free-trial-standard-monthly', 'trial_access_package' => 'premium'];
     }
 
     private function attempts(array $quotes): void

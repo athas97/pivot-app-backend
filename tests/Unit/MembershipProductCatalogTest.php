@@ -7,6 +7,18 @@ use PHPUnit\Framework\TestCase;
 
 class MembershipProductCatalogTest extends TestCase
 {
+    public function test_trial_quotes_use_the_exact_live_offer_ids(): void
+    {
+        $catalog = new MembershipProductCatalog();
+        $this->assertSame('free-trial-standard-monthly', $catalog->trialOfferId('standard', 'monthly'));
+        $this->assertSame('free-trial-annual-standard', $catalog->trialOfferId('standard', 'annual'));
+        $this->assertSame('free-trial-premium-monthly', $catalog->trialOfferId('premium', 'monthly'));
+        $this->assertSame('free-trial-premium-annual', $catalog->trialOfferId('premium', 'annual'));
+        $this->assertNull($catalog->trialOfferId('standard', 'lifetime'));
+        $this->expectException(\InvalidArgumentException::class);
+        $catalog->trialOfferId('unknown', 'monthly');
+    }
+
     public function test_it_resolves_recurring_products_only_with_an_exact_plan(): void
     {
         $catalog = new MembershipProductCatalog();
