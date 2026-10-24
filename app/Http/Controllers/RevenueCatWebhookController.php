@@ -312,7 +312,9 @@ class RevenueCatWebhookController extends Controller
                 && ($quote['base_plan_id'] ?? null) === $choice['base_plan_id']) $matches[] = $attempt;
         }
 
-        return count($matches) === 1 ? $matches[0] : null;
+        $current = array_values(array_filter($matches, fn ($attempt) => in_array($attempt->status, ['pending', 'scheduled'], true)));
+        $candidates = $current !== [] ? $current : $matches;
+        return count($candidates) === 1 ? $candidates[0] : null;
     }
 
     private function isAuthorized(?string $authorizationHeader): bool

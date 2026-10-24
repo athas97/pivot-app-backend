@@ -64,6 +64,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/access', [MembershipController::class, 'access']);
         Route::post('/trial-checkouts', [MembershipController::class, 'trialCheckout']);
+        Route::post('/trial-checkouts/cancel', [MembershipController::class, 'cancelTrialCheckout']);
         Route::post('/trials/start', [MembershipController::class, 'startTrial']);
         Route::get('/access/categories', [MembershipController::class, 'categories']);
         Route::put('/access/categories', [MembershipController::class, 'updateCategories']);

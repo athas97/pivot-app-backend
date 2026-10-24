@@ -174,6 +174,31 @@ class MembershipController extends Controller
         return response()->json($this->access->snapshot($request->user()->fresh()));
     }
 
+    public function cancelTrialCheckout(Request $request, MembershipReconciliationService $reconciliation)
+    {
+        $user = $request->user();
+        try {
+            $reconciliation->reconcile($user);
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 503);
+        }
+
+        DB::transaction(function () use ($user) {
+            $lockedUser = Users::query()->lockForUpdate()->findOrFail($user->id);
+            $access = $this->access->snapshot($lockedUser);
+            if (in_array($access['access_status'], ['active', 'trial', 'billing_restricted'], true)) {
+                abort(409, 'A verified purchase already exists. Refresh or restore your membership.');
+            }
+            $storePurchase = DB::table('verified_purchases')->where('user_id', $user->id)
+                ->where('environment', config('membership.store_environment', 'production'))->whereNull('revoked_at')
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists();
+            if ($storePurchase) abort(409, 'A current store purchase needs reconciliation before cancelling checkout.');
+            app(MembershipTrialReservation::class)->cancelUnpaidAfterVerification($user->id);
+        });
+
+        return response()->json($this->access->snapshot($user->fresh()));
+    }
+
     public function purchaseCheckout(Request $request, MembershipReconciliationService $reconciliation)
     {
         $data = $request->validate(['selected_package' => 'required|in:standard,premium', 'payment_path' => 'required|in:monthly,annual,lifetime']);

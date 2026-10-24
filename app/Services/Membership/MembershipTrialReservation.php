@@ -10,6 +10,22 @@ class MembershipTrialReservation
 {
     public function __construct(private readonly MembershipProductCatalog $catalog) {}
 
+    /** Caller verifies RevenueCat and holds the user lock; late receipts can still complete cancelled attempts. */
+    public function cancelUnpaidAfterVerification(int $userId): void
+    {
+        $trial = DB::table('membership_trials')->where('user_id', $userId)->lockForUpdate()->first();
+        if ($trial?->status !== 'reserved') return;
+
+        foreach (DB::table('membership_attempts')->where('user_id', $userId)
+            ->where('operation', 'trial')->where('status', 'pending')->get(['id']) as $attempt) {
+            app(MembershipAttemptStatus::class)->transition((int) $attempt->id, 'cancelled', null,
+                'complete_revenuecat_reconciliation_found_no_matching_purchase');
+        }
+        DB::table('membership_trials')->where('user_id', $userId)->where('status', 'reserved')->update([
+            'status' => 'eligible', 'reserved_at' => null, 'reservation_expires_at' => null, 'updated_at' => now(),
+        ]);
+    }
+
     /** Called only under the user lock after a complete, successful store reconciliation. */
     public function releaseExpiredAfterVerification(int $userId): void
     {

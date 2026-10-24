@@ -278,7 +278,11 @@ class MembershipReconciliationService
             if (($quote['product_id'] ?? null) === $choice['store_product_id']
                 && ($quote['base_plan_id'] ?? null) === $choice['base_plan_id']) $matches[] = $attempt;
         }
-        return count($matches) === 1 ? $matches[0] : null;
+        // A previously abandoned quote for this product must not make the current
+        // checkout ambiguous. Keep cancelled attempts only for late-receipt recovery.
+        $current = array_values(array_filter($matches, fn ($attempt) => in_array($attempt->status, ['pending', 'scheduled'], true)));
+        $candidates = $current !== [] ? $current : $matches;
+        return count($candidates) === 1 ? $candidates[0] : null;
     }
 
     private function completeMatchingPurchaseAttempt(Users $user, array $choice, mixed $transactionId): void
