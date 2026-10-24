@@ -10,6 +10,21 @@ use ReflectionMethod;
 
 class MembershipEntitlementAliasTest extends TestCase
 {
+    public function test_live_premium_entitlement_with_space_is_recognized(): void
+    {
+        $service = (new ReflectionClass(MembershipReconciliationService::class))->newInstanceWithoutConstructor();
+        $method = new ReflectionMethod($service, 'packageFromEntitlements');
+        $this->assertSame('premium', $method->invoke($service, [
+            ['state' => 'active', 'lookup_key' => 'Premium Android'],
+        ]));
+        $this->assertNull($method->invoke($service, [
+            ['state' => 'inactive', 'lookup_key' => 'Premium Android'],
+        ]));
+        $controller = (new ReflectionClass(RevenueCatWebhookController::class))->newInstanceWithoutConstructor();
+        $this->assertSame('Premium Android', (new ReflectionMethod($controller, 'resolvePrimaryEntitlementId'))
+            ->invoke($controller, ['standard_andriod', 'Premium Android']));
+    }
+
     public function test_reconciliation_recognizes_the_live_standard_alias_without_guessing_other_names(): void
     {
         $service = (new ReflectionClass(MembershipReconciliationService::class))->newInstanceWithoutConstructor();

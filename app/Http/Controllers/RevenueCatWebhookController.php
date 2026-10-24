@@ -165,7 +165,7 @@ class RevenueCatWebhookController extends Controller
         $basePlan = isset($payload['base_plan_id']) && is_string($payload['base_plan_id']) ? $payload['base_plan_id'] : null;
         $packageHint = match (strtolower((string) $entitlementId)) {
             'standard', 'standard_andriod', 'tier2', 'tier_2', 'tier2_android', 'tier_2_android' => 'standard',
-            'premium', 'premium_android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android' => 'premium',
+            'premium', 'premium_android', 'premium android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android' => 'premium',
             default => null,
         };
         $choice = $products->resolve(
@@ -374,7 +374,7 @@ class RevenueCatWebhookController extends Controller
             return $fallbackTierId ?? 1;
         }
 
-        if (in_array(strtolower($entitlementId), ['premium', 'premium_android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) {
+        if (in_array(strtolower($entitlementId), ['premium', 'premium_android', 'premium android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) {
             return (int) (Tier::query()->where('name', '3')->value('id') ?? 3);
         }
         if (in_array(strtolower($entitlementId), ['standard', 'standard_andriod', 'tier2', 'tier_2', 'tier2_android', 'tier_2_android'], true)) {
@@ -403,7 +403,7 @@ class RevenueCatWebhookController extends Controller
         foreach ($entitlementIds as $entitlementId) {
             if (! is_string($entitlementId) || $entitlementId === '') continue;
             $normalized = strtolower($entitlementId);
-            if (in_array($normalized, ['premium', 'premium_android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) return $entitlementId;
+            if (in_array($normalized, ['premium', 'premium_android', 'premium android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) return $entitlementId;
             if ($fallback === null && in_array($normalized, ['standard', 'standard_andriod', 'tier2', 'tier_2', 'tier2_android', 'tier_2_android'], true)) $fallback = $entitlementId;
         }
 
