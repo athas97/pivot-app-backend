@@ -8,6 +8,7 @@ use App\Models\Users;
 use App\Services\Membership\MembershipAccessService;
 use App\Services\Membership\MembershipProductCatalog;
 use App\Services\Membership\MembershipReconciliationService;
+use App\Services\Membership\MembershipTrialReservation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,16 @@ class MembershipController extends Controller
         $access = $this->access->snapshot($user);
         if (in_array($access['access_status'], ['active', 'trial'], true)) {
             return response()->json(['message' => 'An account with current access cannot enroll in a new trial.'], 409);
+        }
+        if ($trial?->status === 'reserved') {
+            $pending = app(MembershipTrialReservation::class)->forUser($user->id, $trial);
+            if ($pending && $pending['selected_package'] === $data['selected_package']
+                && $pending['payment_path'] === $data['payment_path']
+                && now()->lessThan($pending['expires_at'])) {
+                return response()->json($pending);
+            }
+            return response()->json(['message' => 'Resume the existing trial checkout before choosing another plan.',
+                'code' => 'trial_checkout_pending'], 409);
         }
         if ($trial && $trial->status !== 'eligible') {
             return response()->json(['message' => 'The account trial is not available.'], 409);
@@ -310,7 +321,7 @@ class MembershipController extends Controller
         $now = now()->utc();
         $attemptId = (string) Str::uuid();
         $expiresAt = $now->copy()->addMinutes(10);
-        $response = ['attempt_id' => $attemptId, 'expires_at' => $expiresAt->toISOString(), ...$quote];
+        $response = ['attempt_id' => $attemptId, 'expires_at' => $expiresAt->toISOString(), ...$data, ...$quote];
         try {
             DB::transaction(function () use ($user, $operation, $key, $fingerprint, $response, $expiresAt, $now, $reserve) {
                 $lockedUser = Users::query()->lockForUpdate()->findOrFail($user->id);

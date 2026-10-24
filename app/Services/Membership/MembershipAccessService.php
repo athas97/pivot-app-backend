@@ -79,6 +79,8 @@ class MembershipAccessService
             'trial_ends_at' => $trialEnds ? Carbon::parse($trialEnds)->utc()->toISOString() : null,
             'access_ends_at' => $accessEnds ? Carbon::parse($accessEnds)->utc()->toISOString() : null,
             'trial_eligible' => ! $trial || $trial->status === 'eligible',
+            'trial_checkout_pending' => $trial?->status === 'reserved',
+            'pending_trial_checkout' => app(MembershipTrialReservation::class)->forUser($user->id, $trial),
             'legacy_benefits' => ['all_categories' => $legacyAll],
             'selected_category_ids' => $categoryIds,
             'limits' => $limits,
