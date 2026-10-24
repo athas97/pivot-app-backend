@@ -11,9 +11,9 @@ class MembershipProductCatalogTest extends TestCase
     {
         $catalog = new MembershipProductCatalog();
         $this->assertSame('free-trial-standard-monthly', $catalog->trialOfferId('standard', 'monthly'));
-        $this->assertSame('free-trial-annual-standard', $catalog->trialOfferId('standard', 'annual'));
+        $this->assertSame('free-trial-annual-standard-v2', $catalog->trialOfferId('standard', 'annual'));
         $this->assertSame('free-trial-premium-monthly', $catalog->trialOfferId('premium', 'monthly'));
-        $this->assertSame('free-trial-premium-annual', $catalog->trialOfferId('premium', 'annual'));
+        $this->assertSame('free-trial-premium-annual-v2', $catalog->trialOfferId('premium', 'annual'));
         $this->assertNull($catalog->trialOfferId('standard', 'lifetime'));
         $this->expectException(\InvalidArgumentException::class);
         $catalog->trialOfferId('unknown', 'monthly');
@@ -50,10 +50,10 @@ class MembershipProductCatalogTest extends TestCase
         $catalog = new MembershipProductCatalog();
         $products = [
             ['standard', 'monthly', 'standard_android_monthly', 'standard-android-monthly'],
-            ['standard', 'annual', 'standard_android_annual', 'standard-android-annual'],
+            ['standard', 'annual', 'standard_android_annual', 'standard-android-annual-v2'],
             ['standard', 'lifetime', 'standard_android_lifetime', null],
             ['premium', 'monthly', 'premium_android_monthly', 'premium-android-monthly'],
-            ['premium', 'annual', 'premium_android_annual', 'premium-android-annual'],
+            ['premium', 'annual', 'premium_android_annual', 'premium-android-annual-v2'],
             ['premium', 'lifetime', 'premium_android_lifetime', null],
         ];
 
@@ -64,7 +64,8 @@ class MembershipProductCatalogTest extends TestCase
             $this->assertSame($expected, $catalog->checkoutProduct($package, $path));
             $this->assertSame($expected, $catalog->resolve([$product], $basePlan, $package));
             $this->assertSame($expected, $catalog->resolve([$combined], null, $package));
-            $this->assertSame($expected, $catalog->resolve([$product], null, null));
+            if ($path === 'annual') $this->assertNull($catalog->resolve([$product], null, null));
+            else $this->assertSame($expected, $catalog->resolve([$product], null, null));
             $this->assertNull($catalog->resolve([$product], 'wrong-plan', $package));
             $this->assertNull($catalog->resolve([$product], $basePlan, $package === 'standard' ? 'premium' : 'standard'));
         }
@@ -80,5 +81,18 @@ class MembershipProductCatalogTest extends TestCase
         $this->assertSame('standard_android_monthly', $catalog->checkoutProduct('standard', 'monthly')['store_product_id']);
         $this->expectException(\InvalidArgumentException::class);
         $catalog->checkoutProduct('unknown', 'monthly');
+    }
+
+    public function test_annual_v2_checkout_preserves_old_purchases_without_guessing_a_base_plan(): void
+    {
+        $catalog = new MembershipProductCatalog();
+        foreach (['standard', 'premium'] as $package) {
+            $product = $package . '_android_annual';
+            $oldBase = $package . '-android-annual';
+            $this->assertSame($oldBase . '-v2', $catalog->checkoutProduct($package, 'annual')['base_plan_id']);
+            $this->assertSame($oldBase, $catalog->resolve([$product . ':' . $oldBase], null, $package)['base_plan_id']);
+            $this->assertNull($catalog->resolve([$product], null, $package));
+            $this->assertNull($catalog->resolve([$product . ':' . $oldBase], $oldBase . '-v2', $package));
+        }
     }
 }

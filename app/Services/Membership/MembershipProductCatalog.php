@@ -5,6 +5,8 @@ namespace App\Services\Membership;
 class MembershipProductCatalog
 {
     private const PRODUCTS = [
+        'standard_android_annual:standard-android-annual-v2' => ['standard', 'annual', 'standard_android_annual', 'standard-android-annual-v2'],
+        'premium_android_annual:premium-android-annual-v2' => ['premium', 'annual', 'premium_android_annual', 'premium-android-annual-v2'],
         'standard_android_monthly:standard-android-monthly' => ['standard', 'monthly', 'standard_android_monthly', 'standard-android-monthly'],
         'standard_android_annual:standard-android-annual' => ['standard', 'annual', 'standard_android_annual', 'standard-android-annual'],
         'standard_android_lifetime' => ['standard', 'lifetime', 'standard_android_lifetime'],
@@ -45,7 +47,7 @@ class MembershipProductCatalog
 
         return $this->resolve(
             [$package . '_android_' . $path],
-            $path === 'lifetime' ? null : $package . '-android-' . $path,
+            $path === 'lifetime' ? null : $package . '-android-' . $path . ($path === 'annual' ? '-v2' : ''),
             $package,
         );
     }
@@ -55,9 +57,9 @@ class MembershipProductCatalog
         $this->checkoutProduct($package, $path); // Validate the exact supported choice.
         return match ($package . ':' . $path) {
             'standard:monthly' => 'free-trial-standard-monthly',
-            'standard:annual' => 'free-trial-annual-standard',
+            'standard:annual' => 'free-trial-annual-standard-v2',
             'premium:monthly' => 'free-trial-premium-monthly',
-            'premium:annual' => 'free-trial-premium-annual',
+            'premium:annual' => 'free-trial-premium-annual-v2',
             default => null,
         };
     }
@@ -79,7 +81,7 @@ class MembershipProductCatalog
                 if ($packageHint !== null && $packageHint !== $package) continue;
                 $resolvedBasePlan = $path === 'lifetime' ? null : ($configuredBasePlan ?? $path);
 
-                $matches[$package . '|' . $path . '|' . $storeProduct] = [
+                $matches[$package . '|' . $path . '|' . $storeProduct . '|' . ($configuredBasePlan ?? '')] = [
                     'package' => $package,
                     'path' => $path,
                     'product_id' => $resolvedBasePlan === null ? $storeProduct : $storeProduct . ':' . $resolvedBasePlan,
