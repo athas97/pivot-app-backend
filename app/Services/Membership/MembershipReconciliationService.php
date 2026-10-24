@@ -220,8 +220,8 @@ class MembershipReconciliationService
             if (! is_array($entitlement)) continue;
             if (($entitlement['state'] ?? null) !== 'active') continue;
             $lookup = strtolower((string) ($entitlement['lookup_key'] ?? ''));
-            if (in_array($lookup, ['premium', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) return 'premium';
-            if (in_array($lookup, ['standard', 'tier2', 'tier_2', 'tier2_android', 'tier_2_android'], true)) $package = 'standard';
+            if (in_array($lookup, ['premium', 'premium_android', 'tier3', 'tier_3', 'tier3_android', 'tier_3_android'], true)) return 'premium';
+            if (in_array($lookup, ['standard', 'standard_andriod', 'tier2', 'tier_2', 'tier2_android', 'tier_2_android'], true)) $package = 'standard';
         }
         return $package;
     }
