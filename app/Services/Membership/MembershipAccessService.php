@@ -58,10 +58,10 @@ class MembershipAccessService
             ->orderBy('hobby_id')->pluck('hobby_id')->map(fn ($id) => (string) $id)->all();
 
         $limits = $effective === 'premium'
-            ? ['daily_challenges' => 3, 'category_count' => null, 'blocked_apps' => null, 'scheduled_blocking_hours' => 24, 'blocking_intervals' => null, 'blocked_app_usage_minutes' => 20, 'hardcore' => true, 'team_connections' => 10, 'full_research' => true]
+            ? ['daily_challenges' => 5, 'category_count' => null, 'blocked_apps' => null, 'scheduled_blocking_hours' => 24, 'blocking_intervals' => null, 'blocked_app_usage_minutes' => 30, 'hardcore' => true, 'team_connections' => 10, 'full_research' => true]
             : ($effective === 'standard'
-                ? ['daily_challenges' => 2, 'category_count' => $legacyAll ? null : 5, 'blocked_apps' => 10, 'scheduled_blocking_hours' => 12, 'blocking_intervals' => 8, 'blocked_app_usage_minutes' => 15, 'hardcore' => false, 'team_connections' => 5, 'full_research' => false]
-                : ['daily_challenges' => 2, 'category_count' => 5, 'blocked_apps' => 10, 'scheduled_blocking_hours' => 12, 'blocking_intervals' => 8, 'blocked_app_usage_minutes' => 15, 'hardcore' => false, 'team_connections' => 5, 'full_research' => false]);
+                ? ['daily_challenges' => 3, 'category_count' => $legacyAll ? null : 5, 'blocked_apps' => 10, 'scheduled_blocking_hours' => 12, 'blocking_intervals' => 8, 'blocked_app_usage_minutes' => 15, 'hardcore' => false, 'team_connections' => 5, 'full_research' => false]
+                : ['daily_challenges' => 3, 'category_count' => 5, 'blocked_apps' => 10, 'scheduled_blocking_hours' => 12, 'blocking_intervals' => 8, 'blocked_app_usage_minutes' => 15, 'hardcore' => false, 'team_connections' => 5, 'full_research' => false]);
 
         $ack = DB::table('membership_announcement_acknowledgements')
             ->where('user_id', $user->id)->where('version', self::ANNOUNCEMENT_VERSION)->exists();
