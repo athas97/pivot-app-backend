@@ -11,6 +11,7 @@ use App\Services\Membership\MembershipAttemptStatus;
 use App\Services\Membership\VerifiedMembershipProductResolver;
 use App\Services\Membership\MembershipWebhookPolicy;
 use App\Services\Membership\MembershipReconciliationService;
+use App\Services\Membership\CompletedMembershipTrial;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -288,12 +289,16 @@ class RevenueCatWebhookController extends Controller
             }
         }
         if ($isTrial) {
-            $attempt = $this->matchingAttempt($user, $choice, ['trial']);
+            $attempt = $this->matchingAttempt($user, $choice, ['trial'])
+                ?? (new CompletedMembershipTrial())->find($user->id, $choice,
+                    [$transactionId, $payload['original_transaction_id'] ?? null]);
             if ($attempt) {
                 $quoted = json_decode($attempt->quote, true) ?: [];
                 $selectedPackage = $quoted['selected_package'] ?? $package;
                 $effectivePackage = $quoted['trial_access_package'] ?? $package;
-                if ($transactionId) $attemptStatus->transition((int) $attempt->id, 'completed', (string) $transactionId, 'verified_revenuecat_trial');
+                if ($transactionId && $attempt->status !== 'completed') {
+                    $attemptStatus->transition((int) $attempt->id, 'completed', (string) $transactionId, 'verified_revenuecat_trial');
+                }
             }
             DB::table('membership_trials')->updateOrInsert(['user_id' => $user->id], [
                 'status' => 'consumed', 'started_at' => now(), 'ends_at' => $expiresAt,

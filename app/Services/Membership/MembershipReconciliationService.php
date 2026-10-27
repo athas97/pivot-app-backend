@@ -273,9 +273,13 @@ class MembershipReconciliationService
         if (! is_string($transactionId) || $transactionId === '') return null;
         $attempt = $this->matchingAttempt($user, 'trial', $choice);
         $isTrial = ($item['status'] ?? null) === 'trialing';
+        if (! $attempt && $isTrial) {
+            $attempt = (new CompletedMembershipTrial())->find($user->id, $choice,
+                [$transactionId, $item['original_transaction_id'] ?? null]);
+        }
         if (! $attempt && ! $isTrial) return null;
 
-        if ($attempt) {
+        if ($attempt && $attempt->status !== 'completed') {
             $this->attemptStatus->transition((int) $attempt->id, 'completed', $transactionId, 'verified_revenuecat_trial');
         }
         $trialEnd = $isTrial
