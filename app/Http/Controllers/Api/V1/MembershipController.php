@@ -226,6 +226,7 @@ class MembershipController extends Controller
         $scheduled = DB::table('membership_attempts')->where('user_id', $request->user()->id)->where('operation', 'change')->where('status', 'scheduled')->exists();
         if ($scheduled) return response()->json(['message' => 'A scheduled store change must take effect before another change can be quoted.'], 409);
         $recurringCount = DB::table('verified_purchases')->where('user_id', $request->user()->id)
+            ->where('environment', config('membership.store_environment', 'production'))
             ->whereIn('payment_path', ['monthly', 'annual'])->whereNull('revoked_at')
             ->where(function ($query) { $query->whereNull('expires_at')->orWhere('expires_at', '>', now()); })->count();
         if ($recurringCount > 1) return response()->json(['message' => 'Multiple active recurring purchases require reconciliation before a change.'], 409);

@@ -50,7 +50,7 @@ class VerifiedMembershipProductResolver
         foreach (DB::table('membership_attempts')
             ->where('user_id', $userId)
             ->whereIn('operation', $operations)
-            ->whereIn('status', ['pending', 'cancelled'])
+            ->whereIn('status', ['pending', 'scheduled', 'cancelled'])
             ->latest('created_at')
             ->get(['quote']) as $attempt) {
             $quote = json_decode($attempt->quote, true);

@@ -10,7 +10,8 @@ class MembershipAttemptStatus
     private const TRANSITIONS = [
         'pending' => ['completed', 'scheduled', 'cancelled', 'failed'],
         'scheduled' => ['completed', 'cancelled', 'failed'],
-        'cancelled' => ['completed'],
+        // A late verified store response can recover a locally retired quote.
+        'cancelled' => ['completed', 'scheduled'],
         'completed' => [],
         'failed' => [],
     ];

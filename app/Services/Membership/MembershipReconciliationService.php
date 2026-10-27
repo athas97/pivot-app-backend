@@ -52,6 +52,11 @@ class MembershipReconciliationService
 
     private function applyState(Users $user, array $state, string $environment): void
     {
+        // The complete authoritative snapshot replaces the prior store cache atomically.
+        // Without this, refunded/transferred purchases absent from the response stay usable
+        // as replacement evidence and can later be resurrected by an unrelated webhook.
+        DB::table('verified_purchases')->where('user_id', $user->id)->where('environment', $environment)
+            ->update(['revoked_at' => now(), 'updated_at' => now()]);
         $valid = [];
         foreach ($state['subscriptions'] as $subscription) {
             $candidate = $this->subscriptionCandidate($user, $subscription, $environment);
@@ -62,6 +67,14 @@ class MembershipReconciliationService
         foreach ($state['purchases'] as $purchase) {
             $candidate = $this->purchaseCandidate($user, $purchase, $environment);
             if ($candidate) $valid[] = $candidate;
+        }
+
+        $policy = new ScheduledMembershipChangePolicy($this->catalog);
+        foreach (DB::table('membership_attempts')->where('user_id', $user->id)
+            ->where('operation', 'change')->where('status', 'scheduled')->get() as $attempt) {
+            if ($policy->canCancel(json_decode($attempt->quote, true) ?: [], $state['subscriptions'], $environment, now()->getTimestampMs())) {
+                $this->attemptStatus->transition((int) $attempt->id, 'cancelled', null, 'verified_store_cancellation');
+            }
         }
 
         if ($valid !== []) {
@@ -116,6 +129,9 @@ class MembershipReconciliationService
             ]);
         }
         if (! $choice) {
+            if (($item['gives_access'] ?? null) === true) {
+                throw new RuntimeException('An active membership product could not be mapped.');
+            }
             $this->recordSubscription($user, $item, null, $package, $environment, ($item['gives_access'] ?? null) === true);
             return null;
         }
@@ -163,7 +179,9 @@ class MembershipReconciliationService
             'selected_package' => $selected,
             'effective_package' => $effective,
             'payment_path' => $choice['path'],
-            'status' => $isTrial ? 'trial' : (in_array($status, ['in_billing_retry', 'in_grace_period'], true) ? 'billing_restricted' : 'active'),
+            // gives_access plus the verified deadline above determine entitlement.
+            // A billing warning must not revoke a valid grace period.
+            'status' => $isTrial ? 'trial' : 'active',
             'source' => 'store',
             'product_id' => $choice['product_id'],
             'trial_ends_at' => $isTrial ? $periodEnd : null,
@@ -196,7 +214,10 @@ class MembershipReconciliationService
                 'environment' => $environment,
             ]);
         }
-        if (! $choice || $choice['path'] !== 'lifetime') return null;
+        if (! $choice && $package !== null) throw new RuntimeException('An owned membership product could not be mapped.');
+        // The purchases collection also contains unrelated challenge packs.
+        if (! $choice) return null;
+        if ($choice['path'] !== 'lifetime') return null;
         $package = $choice['package'];
         $this->recordPurchase($user, $item, $choice, $package, $environment);
         $this->completeMatchingPurchaseAttempt(

@@ -19,6 +19,7 @@ class MembershipAttemptStatusTest extends TestCase
         $statuses->validateTransition('scheduled', 'cancelled', null, 'verified_store_cancellation');
         $statuses->validateTransition('scheduled', 'completed', 'store-transaction-2', 'verified_revenuecat_webhook');
         $statuses->validateTransition('cancelled', 'completed', 'late-store-transaction', 'verified_revenuecat_webhook');
+        $statuses->validateTransition('cancelled', 'scheduled', null, 'verified_revenuecat_deferred_product_change');
 
         $this->expectException(DomainException::class);
         $statuses->validateTransition('pending', 'completed', null, 'client-claimed-success');

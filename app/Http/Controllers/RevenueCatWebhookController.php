@@ -9,6 +9,8 @@ use App\Models\Users;
 use App\Models\SubscriptionLogs;
 use App\Services\Membership\MembershipAttemptStatus;
 use App\Services\Membership\VerifiedMembershipProductResolver;
+use App\Services\Membership\MembershipWebhookPolicy;
+use App\Services\Membership\MembershipReconciliationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -28,6 +30,7 @@ class RevenueCatWebhookController extends Controller
         RevenueCatWebhookRequest $request,
         VerifiedMembershipProductResolver $products,
         MembershipAttemptStatus $attemptStatus,
+        MembershipReconciliationService $reconciliation,
     ): JsonResponse
     {
         if (! $this->isAuthorized($request->header('Authorization'))) {
@@ -37,6 +40,13 @@ class RevenueCatWebhookController extends Controller
         }
 
         $payload = $request->validated();
+        if ($payload['type'] === 'TEST') {
+            return response()->json(['message' => 'Webhook authentication verified; no access changed.']);
+        }
+        // These events cannot safely be interpreted as a direct product grant.
+        if (in_array($payload['type'], ['TRANSFER', 'REFUND_REVERSED', 'BILLING_ISSUE'], true)) {
+            return $this->reconcileLifecycleEvent($payload, $reconciliation);
+        }
         $user = $this->resolveUser($payload);
 
         if (! $user) {
@@ -139,7 +149,7 @@ class RevenueCatWebhookController extends Controller
     private function syncMembershipPurchase(
         Users $user,
         array $payload,
-        array $eventState,
+        array &$eventState,
         ?string $eventType,
         ?string $productId,
         ?string $newProductId,
@@ -153,6 +163,7 @@ class RevenueCatWebhookController extends Controller
             self::EVENT_INITIAL_PURCHASE, self::EVENT_RENEWAL, self::EVENT_CANCELLATION,
             self::EVENT_EXPIRATION, self::EVENT_PRODUCT_CHANGE, self::EVENT_BILLING_ISSUE,
             self::EVENT_NON_RENEWING_PURCHASE, 'REFUND',
+            'UNCANCELLATION', 'SUBSCRIPTION_EXTENDED', 'SUBSCRIPTION_PAUSED',
         ], true)) return true;
 
         $configuredEnvironment = strtolower((string) config('membership.store_environment', 'production'));
@@ -196,12 +207,16 @@ class RevenueCatWebhookController extends Controller
             if (! $attempt) return true;
             $quote = json_decode($attempt->quote, true) ?: [];
             if (($quote['replacement_mode'] ?? null) === 'DEFERRED') {
-                $attemptStatus->transition((int) $attempt->id, 'scheduled', null, 'verified_revenuecat_deferred_product_change');
+                if ($attempt->status !== 'scheduled') {
+                    $attemptStatus->transition((int) $attempt->id, 'scheduled', null, 'verified_revenuecat_deferred_product_change');
+                }
                 return true;
             }
         }
-        $revoked = $eventType === 'REFUND'
-            || ($eventType === self::EVENT_EXPIRATION && (! $expiresAt || ! $expiresAt->isFuture()));
+        $revoked = MembershipWebhookPolicy::revoked($eventType, $path, $expiresAt);
+        if ($revoked && ! $transactionId) {
+            abort(422, 'A store transaction is required to revoke a purchase.');
+        }
 
         if ($transactionId && $resolvedProduct) {
             DB::table('verified_purchases')->updateOrInsert(
@@ -216,7 +231,7 @@ class RevenueCatWebhookController extends Controller
                     'entitlement' => $entitlementId,
                     'package' => $package,
                     'payment_path' => $path,
-                    'renewal_status' => isset($payload['auto_renew']) ? ($payload['auto_renew'] ? 'renewing' : 'cancelled') : null,
+                    'renewal_status' => MembershipWebhookPolicy::renewalStatus($payload),
                     'expires_at' => $expiresAt,
                     'revoked_at' => $revoked ? now() : null,
                     'payload' => json_encode($payload),
@@ -237,8 +252,9 @@ class RevenueCatWebhookController extends Controller
                 })->orderByRaw("CASE package WHEN 'premium' THEN 2 WHEN 'standard' THEN 1 ELSE 0 END DESC")
                 ->first();
             if ($accountTrial) {
-                return false;
+                return true;
             } elseif (! $replacement) {
+                $eventState = ['tier_id' => $this->resolveFreeTierId(1), 'active' => false];
                 DB::table('account_access')->where('user_id', $user->id)->update([
                     'effective_package' => null, 'access_status' => 'expired', 'access_ends_at' => $expiresAt,
                     'updated_at' => now(),
@@ -256,6 +272,8 @@ class RevenueCatWebhookController extends Controller
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]);
+                // The refunded/expired product must not overwrite another valid subscription.
+                return true;
             }
             return false;
         }
@@ -290,7 +308,7 @@ class RevenueCatWebhookController extends Controller
             'selected_package' => $selectedPackage,
             'effective_package' => $effectivePackage,
             'payment_path' => $path,
-            'access_status' => $isTrial && $isActive ? 'trial' : ($eventType === self::EVENT_BILLING_ISSUE && $isActive ? 'billing_restricted' : ($isActive ? 'active' : 'expired')),
+            'access_status' => $isTrial && $isActive ? 'trial' : ($isActive ? 'active' : 'expired'),
             'access_source' => 'store',
             'product_id' => $choice['product_id'],
             'trial_ends_at' => $isTrial && $isActive ? $expiresAt : null,
@@ -315,6 +333,34 @@ class RevenueCatWebhookController extends Controller
         $current = array_values(array_filter($matches, fn ($attempt) => in_array($attempt->status, ['pending', 'scheduled'], true)));
         $candidates = $current !== [] ? $current : $matches;
         return count($candidates) === 1 ? $candidates[0] : null;
+    }
+
+    private function reconcileLifecycleEvent(array $payload, MembershipReconciliationService $reconciliation): JsonResponse
+    {
+        $environment = strtolower((string) config('membership.store_environment', 'production'));
+        if (isset($payload['environment']) && strtolower($payload['environment']) !== $environment) {
+            return response()->json(['message' => 'Purchase environment is isolated from this backend.']);
+        }
+        $users = [];
+        if ($payload['type'] === 'TRANSFER') {
+            foreach (array_merge($payload['transferred_from'], $payload['transferred_to']) as $id) {
+                $user = $this->resolveUserFromCandidateId($id);
+                if ($user) $users[$user->id] = $user;
+            }
+        } else {
+            $user = $this->resolveUser($payload);
+            if ($user) $users[$user->id] = $user;
+        }
+        if ($users === []) return response()->json(['message' => 'No linked membership account found.'], 422);
+
+        // A retry reads current state again; it never replays an old grant or revocation.
+        // Reconciliation scopes every read to this backend's store environment.
+        try {
+            foreach ($users as $user) $reconciliation->reconcile($user);
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => 'Membership verification unavailable. Retry this event.'], 503);
+        }
+        return response()->json(['message' => 'Current membership ownership reconciled.']);
     }
 
     private function isAuthorized(?string $authorizationHeader): bool
@@ -467,7 +513,7 @@ class RevenueCatWebhookController extends Controller
             ];
         }
 
-        if ($eventType === self::EVENT_CANCELLATION) {
+        if (in_array($eventType, [self::EVENT_CANCELLATION, 'UNCANCELLATION', 'SUBSCRIPTION_EXTENDED', 'SUBSCRIPTION_PAUSED'], true)) {
             return [
                 'tier_id' => $incomingTierId,
                 'active' => ! $isExpired,

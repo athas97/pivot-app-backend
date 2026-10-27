@@ -4,20 +4,11 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Services\Membership\MembershipWebhookPolicy;
 
 class RevenueCatWebhookRequest extends FormRequest
 {
-    private const EVENT_TYPES = [
-        'INITIAL_PURCHASE',
-        'RENEWAL',
-        'CANCELLATION',
-        'EXPIRATION',
-        'PRODUCT_CHANGE',
-        'BILLING_ISSUE',
-        'NON_RENEWING_PURCHASE',
-        'REFUND',
-        'TRANSFER',
-    ];
+    private const EVENT_TYPES = MembershipWebhookPolicy::EVENTS;
 
     private const SUPPORTED_IOS_TIER_PRODUCTS = [
         'tier_2_ios',
@@ -66,7 +57,11 @@ class RevenueCatWebhookRequest extends FormRequest
     {
         return [
             'id' => ['required', 'string', 'max:255'],
-            'app_user_id' => ['required', 'string'],
+            'app_user_id' => ['required_unless:type,TEST,TRANSFER', 'nullable', 'string'],
+            'transferred_from' => ['required_if:type,TRANSFER', 'array', 'min:1'],
+            'transferred_from.*' => ['string'],
+            'transferred_to' => ['required_if:type,TRANSFER', 'array', 'min:1'],
+            'transferred_to.*' => ['string'],
             'original_app_user_id' => ['nullable', 'string'],
             'aliases' => ['nullable', 'array'],
             'aliases.*' => ['string'],
@@ -95,7 +90,7 @@ class RevenueCatWebhookRequest extends FormRequest
             ],
             'entitlement_ids' => ['nullable', 'array'],
             'entitlement_ids.*' => ['string', 'max:255'],
-            'type' => ['nullable', Rule::in(self::EVENT_TYPES)],
+            'type' => ['required', Rule::in(self::EVENT_TYPES)],
             'new_product_id' => [
                 'nullable',
                 'string',
