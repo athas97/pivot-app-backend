@@ -3,6 +3,8 @@
 namespace App\Organization\Models;
 
 use App\Models\User;
+use App\Organization\Enums\AuditAction;
+use App\Organization\Enums\AuditActorType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -26,6 +28,8 @@ class OrganizationAuditLog extends Model
     protected function casts(): array
     {
         return [
+            'action' => AuditAction::class,
+            'actor_type' => AuditActorType::class,
             'metadata' => 'array',
             'created_at' => 'datetime',
         ];

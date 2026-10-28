@@ -52,4 +52,9 @@ class OrganizationRoleAssignment extends Model
     {
         return $this->belongsTo(User::class, 'assigned_by');
     }
+
+    public function isActive(): bool
+    {
+        return $this->revoked_at === null;
+    }
 }
