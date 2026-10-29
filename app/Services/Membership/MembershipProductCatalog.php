@@ -5,6 +5,13 @@ namespace App\Services\Membership;
 class MembershipProductCatalog
 {
     private const PRODUCTS = [
+        // App Store products have distinct billing-period IDs and no Google base plan.
+        'standard_lifetime' => ['standard', 'lifetime', 'standard_lifetime', null],
+        'premium_lifetime' => ['premium', 'lifetime', 'premium_lifetime', null],
+        'standard_monthly' => ['standard', 'monthly', 'standard_monthly', null],
+        'standard_annual' => ['standard', 'annual', 'standard_annual', null],
+        'premium_monthly' => ['premium', 'monthly', 'premium_monthly', null],
+        'premium_annual' => ['premium', 'annual', 'premium_annual', null],
         'standard_android_annual:standard-android-annual-v2' => ['standard', 'annual', 'standard_android_annual', 'standard-android-annual-v2'],
         'premium_android_annual:premium-android-annual-v2' => ['premium', 'annual', 'premium_android_annual', 'premium-android-annual-v2'],
         'standard_android_monthly:standard-android-monthly' => ['standard', 'monthly', 'standard_android_monthly', 'standard-android-monthly'],
@@ -79,7 +86,8 @@ class MembershipProductCatalog
                     ? strtolower($basePlan) !== $configuredBasePlan
                     : ! $this->basePlanMatches($path, $storeProduct, $basePlan))) continue;
                 if ($packageHint !== null && $packageHint !== $package) continue;
-                $resolvedBasePlan = $path === 'lifetime' ? null : ($configuredBasePlan ?? $path);
+                $resolvedBasePlan = $path === 'lifetime' ? null
+                    : (array_key_exists(3, $definition) ? $configuredBasePlan : $path);
 
                 $matches[$package . '|' . $path . '|' . $storeProduct . '|' . ($configuredBasePlan ?? '')] = [
                     'package' => $package,
