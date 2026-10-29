@@ -3,7 +3,9 @@
 namespace Tests\Unit;
 
 use App\Http\Controllers\Api\V1\MembershipController;
+use App\Models\User;
 use App\Models\Users;
+use PHPUnit\Framework\Attributes\DataProvider;
 use App\Models\UserProfile;
 use App\Services\Membership\MembershipAccessService;
 use App\Services\Membership\MembershipProductCatalog;
@@ -17,9 +19,10 @@ use Tests\TestCase;
 
 class MembershipAuthenticatedUserTest extends TestCase
 {
-    public function test_trial_checkout_handles_the_login_model_without_a_type_error(): void
+    #[DataProvider('userModels')]
+    public function test_trial_checkout_handles_the_login_model_without_a_type_error(string $model): void
     {
-        $user = (new Users())->forceFill(['id' => 42]);
+        $user = (new $model())->forceFill(['id' => 42]);
         $user->setRelation('profile', (new UserProfile())->forceFill(['onboarding_completed' => true]));
         $attempts = Mockery::mock(Builder::class);
         $attempts->shouldReceive('where')->andReturnSelf();
@@ -44,9 +47,10 @@ class MembershipAuthenticatedUserTest extends TestCase
         $this->assertSame('The account trial is not available.', $response->getData(true)['message']);
     }
 
-    public function test_reconciliation_accepts_the_login_model_and_reports_upstream_failure(): void
+    #[DataProvider('userModels')]
+    public function test_reconciliation_accepts_the_login_model_and_reports_upstream_failure(string $model): void
     {
-        $user = (new Users())->forceFill(['id' => 42]);
+        $user = (new $model())->forceFill(['id' => 42]);
         foreach (['subscriptions', 'account_access'] as $table) {
             $query = Mockery::mock(Builder::class);
             $query->shouldReceive('where')->once()->with('user_id', 42)->andReturnSelf();
@@ -62,5 +66,10 @@ class MembershipAuthenticatedUserTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Test upstream unavailable');
         $this->app->make(MembershipReconciliationService::class)->reconcile($user);
+    }
+
+    public static function userModels(): array
+    {
+        return ['authenticated User' => [User::class], 'legacy Users' => [Users::class]];
     }
 }

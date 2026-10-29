@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hobby;
+use App\Models\User;
 use App\Models\Users;
 use App\Services\Membership\MembershipAccessService;
 use App\Services\Membership\MembershipProductCatalog;
@@ -297,7 +298,7 @@ class MembershipController extends Controller
         return null;
     }
 
-    private function releaseExpiredTrialReservation(Users $user, MembershipReconciliationService $reconciliation)
+    private function releaseExpiredTrialReservation(User|Users $user, MembershipReconciliationService $reconciliation)
     {
         $trial = DB::table('membership_trials')->where('user_id', $user->id)->first();
         if ($trial?->status !== 'reserved' || ! $trial->reservation_expires_at
