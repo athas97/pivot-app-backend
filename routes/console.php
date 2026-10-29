@@ -3,6 +3,7 @@
 use App\Models\Activity;
 use App\Organization\Jobs\ActivateOrganizationContracts;
 use App\Organization\Jobs\ExpireOrganizationContracts;
+use App\Organization\Jobs\ReconcileOrganizationSeats;
 use App\Support\InstructionFormatter;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -36,3 +37,4 @@ Artisan::command('activities:normalize-instructions', function () {
 Schedule::command('app:purge-old-usage-logs')->daily();
 Schedule::job(new ExpireOrganizationContracts)->daily();
 Schedule::job(new ActivateOrganizationContracts)->daily();
+Schedule::job(new ReconcileOrganizationSeats)->daily();

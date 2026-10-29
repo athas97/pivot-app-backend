@@ -7,6 +7,7 @@ use App\Organization\Enums\AuditAction;
 use App\Organization\Enums\OrganizationStatus;
 use App\Organization\Exceptions\OrganizationActionException;
 use App\Organization\Models\Organization;
+use App\Organization\Models\OrganizationMembership;
 use App\Organization\Repositories\Contracts\OrganizationRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +21,7 @@ class OrganizationControlService
         protected OrganizationRepositoryInterface $organizations,
         protected AuditLogger $audit,
         protected ContractMembershipService $contractMemberships,
+        protected SeatService $seats,
     ) {}
 
     public function suspend(Organization $organization, User $actor, string $reason): Organization
@@ -61,6 +63,8 @@ class OrganizationControlService
     {
         DB::transaction(function () use ($organization, $actor, $reason) {
             $this->organizations->delete($organization);
+            // Released seats let these users join another organization (one active organization per user).
+            $this->seats->releaseAll($organization, OrganizationMembership::REASON_ORGANIZATION_REMOVED, $actor);
 
             $this->audit->record(
                 action: AuditAction::ORGANIZATION_REMOVED,

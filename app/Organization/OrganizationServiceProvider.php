@@ -14,9 +14,11 @@ use App\Organization\Models\OrganizationMembership;
 use App\Organization\Models\OrganizationRedemptionCode;
 use App\Organization\Models\OrganizationRoleAssignment;
 use App\Organization\Models\OrganizationScimCredential;
+use App\Organization\Policies\OrganizationMembershipPolicy;
 use App\Organization\Policies\OrganizationPolicy;
 use App\Organization\Policies\OrganizationRoleAssignmentPolicy;
 use App\Organization\Repositories\Contracts\OrganizationAuditLogRepositoryInterface;
+use App\Organization\Repositories\Contracts\OrganizationInvitationRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationMembershipRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationRoleAssignmentRepositoryInterface;
@@ -24,6 +26,7 @@ use App\Organization\Repositories\Contracts\OrganizationDomainRepositoryInterfac
 use App\Organization\Repositories\Contracts\OrganizationRedemptionCodeRepositoryInterface;
 use App\Organization\Repositories\OrganizationAuditLogRepository;
 use App\Organization\Repositories\OrganizationDomainRepository;
+use App\Organization\Repositories\OrganizationInvitationRepository;
 use App\Organization\Repositories\OrganizationMembershipRepository;
 use App\Organization\Repositories\OrganizationRedemptionCodeRepository;
 use App\Organization\Repositories\OrganizationRepository;
@@ -44,6 +47,7 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->app->bind(OrganizationAuditLogRepositoryInterface::class, OrganizationAuditLogRepository::class);
         $this->app->bind(OrganizationDomainRepositoryInterface::class, OrganizationDomainRepository::class);
         $this->app->bind(OrganizationRedemptionCodeRepositoryInterface::class, OrganizationRedemptionCodeRepository::class);
+        $this->app->bind(OrganizationInvitationRepositoryInterface::class, OrganizationInvitationRepository::class);
     }
 
     public function boot(): void
@@ -63,6 +67,7 @@ class OrganizationServiceProvider extends ServiceProvider
     {
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(OrganizationRoleAssignment::class, OrganizationRoleAssignmentPolicy::class);
+        Gate::policy(OrganizationMembership::class, OrganizationMembershipPolicy::class);
     }
 
     // Stable audit target_type values instead of PHP class names.

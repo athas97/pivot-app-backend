@@ -21,4 +21,10 @@ interface OrganizationDomainRepositoryInterface
     public function competingClaims(OrganizationDomain $domain): Collection;
 
     public function delete(OrganizationDomain $domain): void;
+
+    /**
+     * The verified domain that covers an email domain: an exact match, or a parent domain
+     * with include_subdomains. The most specific match wins.
+     */
+    public function findVerifiedForEmailDomain(string $emailDomain): ?OrganizationDomain;
 }

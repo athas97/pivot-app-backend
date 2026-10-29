@@ -53,4 +53,17 @@ class OrganizationRoleAssignmentRepository implements OrganizationRoleAssignment
 
         return $assignment;
     }
+
+    public function revokeAllFor(string $organizationId, int $userId): Collection
+    {
+        $active = OrganizationRoleAssignment::query()
+            ->where('organization_id', $organizationId)
+            ->where('user_id', $userId)
+            ->whereNull('revoked_at');
+
+        $roles = (clone $active)->get()->pluck('role');
+        $active->update(['revoked_at' => now()]);
+
+        return $roles;
+    }
 }

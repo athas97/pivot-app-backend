@@ -27,4 +27,14 @@ interface OrganizationRepositoryInterface
     public function eachPendingStartedBy(Carbon $date, Closure $callback): void;
 
     public function delete(Organization $organization): void;
+
+    /**
+     * Reloads the organization and locks its row until the transaction ends (SELECT … FOR UPDATE).
+     */
+    public function lockForSeatAllocation(Organization $organization): Organization;
+
+    /**
+     * Every organization, including removed ones, with its active membership count as active_memberships_count.
+     */
+    public function eachWithActiveMembershipCount(Closure $callback): void;
 }

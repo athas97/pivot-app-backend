@@ -25,4 +25,22 @@ class OrganizationRedemptionCodeRepository implements OrganizationRedemptionCode
 
         return $code->refresh();
     }
+
+    public function findByHashForUpdate(string $codeHash): ?OrganizationRedemptionCode
+    {
+        return OrganizationRedemptionCode::query()
+            ->where('code_hash', $codeHash)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    public function recordUse(OrganizationRedemptionCode $code): OrganizationRedemptionCode
+    {
+        $code->forceFill([
+            'uses_count' => $code->uses_count + 1,
+            'last_used_at' => now(),
+        ])->save();
+
+        return $code;
+    }
 }

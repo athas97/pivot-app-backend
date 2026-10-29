@@ -2,6 +2,7 @@
 
 namespace App\Organization\Exceptions;
 
+use App\Organization\Enums\MembershipStatus;
 use App\Organization\Enums\OrganizationStatus;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -53,5 +54,20 @@ class OrganizationActionException extends HttpException
     public static function codeAlreadyInactive(): self
     {
         return new self(409, 'This redemption code is already inactive.');
+    }
+
+    public static function invalidMembershipTransition(MembershipStatus $current, string $action): self
+    {
+        return new self(409, "A membership with status '{$current->value}' cannot be {$action}.");
+    }
+
+    public static function alreadyActiveMember(): self
+    {
+        return new self(409, 'This person is already an active member of this organization.');
+    }
+
+    public static function invitationNotPending(): self
+    {
+        return new self(409, 'Only pending invitations can be revoked.');
     }
 }

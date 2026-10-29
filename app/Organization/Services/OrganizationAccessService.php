@@ -7,6 +7,7 @@ use App\Organization\Enums\OrganizationPermission;
 use App\Organization\Enums\OrganizationRole;
 use App\Organization\Enums\OrganizationStatus;
 use App\Organization\Models\Organization;
+use App\Organization\Repositories\Contracts\OrganizationMembershipRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationRoleAssignmentRepositoryInterface;
 use Illuminate\Support\Collection;
 
@@ -17,7 +18,8 @@ use Illuminate\Support\Collection;
 class OrganizationAccessService
 {
     public function __construct(
-        protected OrganizationRoleAssignmentRepositoryInterface $roleAssignments
+        protected OrganizationRoleAssignmentRepositoryInterface $roleAssignments,
+        protected OrganizationMembershipRepositoryInterface $memberships,
     ) {}
 
     /**
@@ -25,12 +27,27 @@ class OrganizationAccessService
      */
     public function rolesIn(User $user, Organization $organization): Collection
     {
+        // A suspended member keeps their role assignments but cannot use them until restored.
+        if ($this->memberships->isSuspendedMember($organization->id, $user->id)) {
+            return collect();
+        }
+
         return $this->roleAssignments->activeRolesFor($user->id, $organization->id);
     }
 
     public function highestRoleIn(User $user, Organization $organization): ?OrganizationRole
     {
         return $this->rolesIn($user, $organization)
+            ->sortByDesc(fn (OrganizationRole $role) => $role->rank())
+            ->first();
+    }
+
+    /**
+     * The highest role the user holds, even while their membership is suspended (used to rank targets).
+     */
+    public function highestAssignedRoleIn(User $user, Organization $organization): ?OrganizationRole
+    {
+        return $this->roleAssignments->activeRolesFor($user->id, $organization->id)
             ->sortByDesc(fn (OrganizationRole $role) => $role->rank())
             ->first();
     }

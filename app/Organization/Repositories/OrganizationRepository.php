@@ -2,6 +2,7 @@
 
 namespace App\Organization\Repositories;
 
+use App\Organization\Enums\MembershipStatus;
 use App\Organization\Enums\OrganizationStatus;
 use App\Organization\Models\Organization;
 use App\Organization\Models\OrganizationContract;
@@ -68,6 +69,26 @@ class OrganizationRepository implements OrganizationRepositoryInterface
             ->whereNotNull('contract_start_at')
             ->where('contract_start_at', '<=', $date)
             ->where('contract_end_at', '>', $date)
+            ->orderBy('id')
+            ->chunkById(100, function ($organizations) use ($callback): void {
+                foreach ($organizations as $organization) {
+                    $callback($organization);
+                }
+            });
+    }
+
+    public function lockForSeatAllocation(Organization $organization): Organization
+    {
+        return Organization::withTrashed()
+            ->whereKey($organization->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    public function eachWithActiveMembershipCount(Closure $callback): void
+    {
+        Organization::withTrashed()
+            ->withCount(['memberships as active_memberships_count' => fn ($query) => $query->where('status', MembershipStatus::ACTIVE)])
             ->orderBy('id')
             ->chunkById(100, function ($organizations) use ($callback): void {
                 foreach ($organizations as $organization) {

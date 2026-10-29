@@ -3,6 +3,7 @@
 namespace App\Organization\Models;
 
 use App\Organization\Database\Factories\OrganizationInvitationFactory;
+use App\Organization\Enums\InvitationStatus;
 use App\Organization\Enums\OrganizationRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -33,6 +34,7 @@ class OrganizationInvitation extends Model
     {
         return [
             'role' => OrganizationRole::class,
+            'status' => InvitationStatus::class,
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
         ];
@@ -51,6 +53,11 @@ class OrganizationInvitation extends Model
     public function inviter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at->isPast();
     }
 
     public function acceptedBy(): BelongsTo

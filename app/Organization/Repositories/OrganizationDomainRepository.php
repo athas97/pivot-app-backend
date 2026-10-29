@@ -53,4 +53,23 @@ class OrganizationDomainRepository implements OrganizationDomainRepositoryInterf
     {
         $domain->delete();
     }
+
+    public function findVerifiedForEmailDomain(string $emailDomain): ?OrganizationDomain
+    {
+        // eng.acme.com → parents [acme.com, com]
+        $labels = explode('.', $emailDomain);
+        $parents = [];
+        for ($i = 1; $i < count($labels); $i++) {
+            $parents[] = implode('.', array_slice($labels, $i));
+        }
+
+        return OrganizationDomain::query()
+            ->with('organization')
+            ->where('status', OrganizationDomainStatus::VERIFIED)
+            ->where(fn ($query) => $query
+                ->where('domain', $emailDomain)
+                ->orWhere(fn ($query) => $query->whereIn('domain', $parents)->where('include_subdomains', true)))
+            ->orderByRaw('length(domain) desc')
+            ->first();
+    }
 }

@@ -21,4 +21,11 @@ interface OrganizationRoleAssignmentRepositoryInterface
     public function create(array $data): OrganizationRoleAssignment;
 
     public function revoke(OrganizationRoleAssignment $assignment): OrganizationRoleAssignment;
+
+    /**
+     * Revokes every active role of the user in the organization.
+     *
+     * @return Collection<int, OrganizationRole> The roles that were revoked.
+     */
+    public function revokeAllFor(string $organizationId, int $userId): Collection;
 }

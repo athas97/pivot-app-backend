@@ -13,4 +13,11 @@ interface OrganizationRedemptionCodeRepositoryInterface
     public function create(Organization $organization, array $data): OrganizationRedemptionCode;
 
     public function deactivate(OrganizationRedemptionCode $code): OrganizationRedemptionCode;
+
+    /**
+     * Finds a code by hash and locks its row until the transaction ends, so use limits cannot be passed.
+     */
+    public function findByHashForUpdate(string $codeHash): ?OrganizationRedemptionCode;
+
+    public function recordUse(OrganizationRedemptionCode $code): OrganizationRedemptionCode;
 }

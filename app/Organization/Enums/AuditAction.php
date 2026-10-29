@@ -32,5 +32,16 @@ enum AuditAction: string
     case ORGANIZATION_CODE_CREATED = 'organization_code.created';
     case ORGANIZATION_CODE_DEACTIVATED = 'organization_code.deactivated';
 
+    case MEMBERSHIP_ACTIVATED = 'organization_membership.activated';
+    case MEMBERSHIP_SUSPENDED = 'organization_membership.suspended';
+    case MEMBERSHIP_DEACTIVATED = 'organization_membership.deactivated';
+    case MEMBERSHIPS_RELEASED = 'organization_membership.released';
+
+    case INVITATION_CREATED = 'organization_invitation.created';
+    case INVITATION_ACCEPTED = 'organization_invitation.accepted';
+    case INVITATION_REVOKED = 'organization_invitation.revoked';
+
+    case SEATS_RECONCILED = 'organization.seats_reconciled';
+
     case TENANT_ACCESS_DENIED = 'tenant.access_denied';
 }

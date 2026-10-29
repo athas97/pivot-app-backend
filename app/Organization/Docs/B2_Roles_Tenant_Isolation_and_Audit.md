@@ -186,7 +186,7 @@ Other helpers on the same service:
 
 | Method | Purpose |
 |---|---|
-| `rolesIn(user, org)` | Active `OrganizationRole`s of the user in that organization |
+| `rolesIn(user, org)` | Active `OrganizationRole`s of the user in that organization. Empty while the user's membership there is `suspended` (B4) |
 | `highestRoleIn(user, org)` | Highest-ranked active role (used for the rank rule) |
 | `canEnterTenant(user, org)` | Pivot staff, or an active `ORG_OWNER` / `ORG_ADMIN` / `ORG_ANALYST` role |
 | `allowsDelegatedAdministration(org)` | `false` when the organization is suspended or removed |

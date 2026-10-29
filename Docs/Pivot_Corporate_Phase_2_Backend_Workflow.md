@@ -268,17 +268,17 @@ If a corporate domain is recognized but a seat cannot be allocated, the user's p
 
 ### Steps
 
-- [ ] 1. Build **SeatService.allocate()**: start transaction → lock organization row → check status/contract → count active memberships → compare with seat_limit → create/activate membership → commit.
-- [ ] 2. Build **SeatService.release()**: set membership deactivated, set deactivated_at and reason. Personal data stays.
-- [ ] 3. Add idempotency: if the user already has an active membership in this organization, return it (do not create a new one).
-- [ ] 4. Membership lifecycle: invited → active → suspended → deactivated / expired, plus restore.
-- [ ] 5. Work-email flow (see below).
-- [ ] 6. Organization-code flow (see below).
-- [ ] 7. Existing user flow: link the current account to the organization. Never create a second account.
-- [ ] 8. Invitation flow: create invitation with token_hash and expiry → accept → allocate seat.
-- [ ] 9. Domain known but no free seat: personal registration still succeeds. Return a clear corporate join status.
-- [ ] 10. Async job: **seat reconciliation**. Regularly compare the seat count with active memberships and report or fix differences.
-- [ ] 11. Write tests: parallel requests cannot pass the seat limit; code use limit; expired code; suspended organization.
+- [x] 1. Build **SeatService.allocate()**: start transaction → lock organization row → check status/contract → count active memberships → compare with seat_limit → create/activate membership → commit.
+- [x] 2. Build **SeatService.release()**: set membership deactivated, set deactivated_at and reason. Personal data stays.
+- [x] 3. Add idempotency: if the user already has an active membership in this organization, return it (do not create a new one).
+- [x] 4. Membership lifecycle: invited → active → suspended → deactivated / expired, plus restore.
+- [x] 5. Work-email flow (see below).
+- [x] 6. Organization-code flow (see below).
+- [x] 7. Existing user flow: link the current account to the organization. Never create a second account.
+- [x] 8. Invitation flow: create invitation with token_hash and expiry → accept → allocate seat.
+- [x] 9. Domain known but no free seat: personal registration still succeeds. Return a clear corporate join status.
+- [x] 10. Async job: **seat reconciliation**. Regularly compare the seat count with active memberships and report or fix differences.
+- [x] 11. Write tests: parallel requests cannot pass the seat limit; code use limit; expired code; suspended organization.
 
 **Flow – Work email signup**
 

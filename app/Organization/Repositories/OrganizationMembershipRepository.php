@@ -5,6 +5,7 @@ namespace App\Organization\Repositories;
 use App\Organization\Enums\MembershipStatus;
 use App\Organization\Models\OrganizationMembership;
 use App\Organization\Repositories\Contracts\OrganizationMembershipRepositoryInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -27,6 +28,54 @@ class OrganizationMembershipRepository implements OrganizationMembershipReposito
             ->count();
     }
 
+    public function paginateFor(string $organizationId, ?MembershipStatus $status, int $perPage): LengthAwarePaginator
+    {
+        return OrganizationMembership::query()
+            ->with('user:id,name,email')
+            ->where('organization_id', $organizationId)
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
+    public function findFor(string $organizationId, int $userId): ?OrganizationMembership
+    {
+        return OrganizationMembership::query()
+            ->where('organization_id', $organizationId)
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->first();
+    }
+
+    public function findActiveForUser(int $userId): ?OrganizationMembership
+    {
+        return OrganizationMembership::query()
+            ->where('user_id', $userId)
+            ->where('status', MembershipStatus::ACTIVE)
+            ->first();
+    }
+
+    public function create(array $data): OrganizationMembership
+    {
+        return OrganizationMembership::create($data);
+    }
+
+    public function update(OrganizationMembership $membership, array $data): OrganizationMembership
+    {
+        $membership->update($data);
+
+        return $membership;
+    }
+
+    public function isSuspendedMember(string $organizationId, int $userId): bool
+    {
+        return OrganizationMembership::query()
+            ->where('organization_id', $organizationId)
+            ->where('user_id', $userId)
+            ->where('status', MembershipStatus::SUSPENDED)
+            ->exists();
+    }
+
     public function expireActive(string $organizationId, string $reason, Carbon $at): int
     {
         return OrganizationMembership::query()
@@ -34,6 +83,19 @@ class OrganizationMembershipRepository implements OrganizationMembershipReposito
             ->where('status', MembershipStatus::ACTIVE)
             ->update([
                 'status' => MembershipStatus::EXPIRED,
+                'deactivated_at' => $at,
+                'deactivation_reason' => $reason,
+                'updated_at' => $at,
+            ]);
+    }
+
+    public function deactivateAll(string $organizationId, string $reason, Carbon $at): int
+    {
+        return OrganizationMembership::query()
+            ->where('organization_id', $organizationId)
+            ->whereIn('status', [MembershipStatus::ACTIVE, MembershipStatus::SUSPENDED, MembershipStatus::INVITED])
+            ->update([
+                'status' => MembershipStatus::DEACTIVATED,
                 'deactivated_at' => $at,
                 'deactivation_reason' => $reason,
                 'updated_at' => $at,
