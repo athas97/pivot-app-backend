@@ -13,6 +13,9 @@ class OrganizationMembership extends Model
 {
     use HasFactory;
 
+    // Set when the organization's contract expires; only these memberships are restored on renewal.
+    public const REASON_CONTRACT_EXPIRED = 'organization_contract_expired';
+
     protected $fillable = [
         'organization_id',
         'user_id',

@@ -19,6 +19,7 @@ class OrganizationControlService
     public function __construct(
         protected OrganizationRepositoryInterface $organizations,
         protected AuditLogger $audit,
+        protected ContractMembershipService $contractMemberships,
     ) {}
 
     public function suspend(Organization $organization, User $actor, string $reason): Organization
@@ -36,7 +37,24 @@ class OrganizationControlService
             throw OrganizationActionException::invalidStatusTransition($organization->status, 'reactivated');
         }
 
-        return $this->changeStatus($organization, OrganizationStatus::ACTIVE, AuditAction::ORGANIZATION_REACTIVATED, $actor, $reason);
+        if ($organization->contract_end_at?->isPast()) {
+            throw OrganizationActionException::invalidStatusTransition($organization->status, 'reactivated because its contract has ended; renew the contract instead');
+        }
+
+        // Lifting a suspension never makes an organization active before its contract starts.
+        $status = $organization->contract_start_at?->isFuture()
+            ? OrganizationStatus::PENDING
+            : OrganizationStatus::ACTIVE;
+
+        return DB::transaction(function () use ($organization, $status, $actor, $reason) {
+            $organization = $this->changeStatus($organization, $status, AuditAction::ORGANIZATION_REACTIVATED, $actor, $reason);
+
+            if ($status === OrganizationStatus::ACTIVE) {
+                $this->contractMemberships->restoreAfterContractExpiry($organization, $actor);
+            }
+
+            return $organization;
+        });
     }
 
     public function remove(Organization $organization, User $actor, string $reason): void
@@ -65,6 +83,7 @@ class OrganizationControlService
 
         return DB::transaction(function () use ($organization, $status, $action, $actor, $reason, $previous) {
             $this->organizations->updateStatus($organization, $status);
+            $organization->currentContract?->update(['status' => $status]);
 
             $this->audit->record(
                 action: $action,

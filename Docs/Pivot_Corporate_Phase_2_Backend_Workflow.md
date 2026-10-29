@@ -227,14 +227,14 @@ Fields below are the recommended fields from the architecture document.
 
 ### Steps
 
-- [ ] 1. OrganizationService: create, edit, suspend, renew. Set type, package, contract dates and seat_limit.
-- [ ] 2. Contract lifecycle: activate → active → suspended / expired → renewed.
-- [ ] 3. Async job: **contract expiry**. Each day, find contracts past contract_end_at, mark them expired, and expire their active memberships.
-- [ ] 4. DomainService: add domain, normalize (lowercase, trim), verify, set primary, include_subdomains option.
-- [ ] 5. RedemptionCodeService: generate company/pilot/department codes. Store only the **hash** + prefix. Set max_uses, starts_at, expires_at, is_active.
-- [ ] 6. Custom package: save organization_entitlements (feature_key + value_json) for CUSTOM organizations.
-- [ ] 7. Store prices, discounts, minimum seats, platform fees and volume bands in pricing_config (contract/pricing records), never in code.
-- [ ] 8. Write audit log entries for every change in this phase.
+- [x] 1. OrganizationService: create, edit, suspend, renew. Set type, package, contract dates and seat_limit.
+- [x] 2. Contract lifecycle: activate → active → suspended / expired → renewed.
+- [x] 3. Async job: **contract expiry**. Each day, find contracts past contract_end_at, mark them expired, and expire their active memberships.
+- [x] 4. DomainService: add domain, normalize (lowercase, trim), verify, set primary, include_subdomains option.
+- [x] 5. RedemptionCodeService: generate company/pilot/department codes. Store only the **hash** + prefix. Set max_uses, starts_at, expires_at, is_active.
+- [x] 6. Custom package: save organization_entitlements (feature_key + value_json) for CUSTOM organizations.
+- [x] 7. Store prices, discounts, minimum seats, platform fees and volume bands in pricing_config (contract/pricing records), never in code.
+- [x] 8. Write audit log entries for every change in this phase.
 
 > **Done when:** In Staging you can create the test organization, add a domain and a code, and expire it with the job.
 

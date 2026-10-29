@@ -3,6 +3,7 @@
 namespace App\Organization\Models;
 
 use App\Organization\Database\Factories\OrganizationRedemptionCodeFactory;
+use App\Organization\Enums\RedemptionCodeType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ class OrganizationRedemptionCode extends Model
     protected $fillable = [
         'organization_id',
         'name',
+        'code_type',
         'code_hash',
         'code_prefix',
         'max_uses',
@@ -34,6 +36,7 @@ class OrganizationRedemptionCode extends Model
     {
         return [
             'max_uses' => 'integer',
+            'code_type' => RedemptionCodeType::class,
             'uses_count' => 'integer',
             'starts_at' => 'datetime',
             'expires_at' => 'datetime',

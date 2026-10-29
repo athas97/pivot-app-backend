@@ -2,6 +2,7 @@
 
 namespace App\Organization\Database\Seeders;
 
+use App\Organization\Enums\OrganizationDomainStatus;
 use App\Organization\Enums\OrganizationStatus;
 use App\Organization\Enums\OrganizationType;
 use App\Organization\Enums\Package;
@@ -29,11 +30,22 @@ class PivotTestOrganizationSeeder extends Seeder
             ]
         );
 
+        // Contract history record (B3). Only created once, so reseeding does not add duplicates.
+        if (! $organization->contracts()->exists()) {
+            $organization->contracts()->create([
+                'status' => $organization->status,
+                'package_code' => $organization->package_code,
+                'seat_limit' => $organization->seat_limit,
+                'starts_at' => $organization->contract_start_at,
+                'ends_at' => $organization->contract_end_at,
+                'pricing_config' => $organization->pricing_config,
+            ]);
+        }
+
         OrganizationDomain::updateOrCreate(
-            ['domain' => 'pivot-test.internal'],
+            ['organization_id' => $organization->id, 'domain' => 'pivot-test.internal'],
             [
-                'organization_id' => $organization->id,
-                'status' => 'verified',
+                'status' => OrganizationDomainStatus::VERIFIED,
                 'is_primary' => true,
                 'verification_method' => 'manual',
                 'include_subdomains' => false,

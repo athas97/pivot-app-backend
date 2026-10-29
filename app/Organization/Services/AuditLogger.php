@@ -45,7 +45,8 @@ class AuditLogger
         ?User $actor = null,
         ?AuditActorType $actorType = null,
     ): OrganizationAuditLog {
-        $actor ??= $this->authenticatedUser();
+        // An explicit SYSTEM action never borrows whoever happens to be logged in.
+        $actor ??= $actorType === AuditActorType::SYSTEM ? null : $this->authenticatedUser();
         $request = request();
 
         return $this->auditLogs->create([

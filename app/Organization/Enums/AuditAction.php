@@ -16,6 +16,21 @@ enum AuditAction: string
     case ORGANIZATION_SUSPENDED = 'organization.suspended';
     case ORGANIZATION_REACTIVATED = 'organization.reactivated';
     case ORGANIZATION_REMOVED = 'organization.removed';
+    case ORGANIZATION_CREATED = 'organization.created';
+    case ORGANIZATION_UPDATED = 'organization.updated';
+    case ORGANIZATION_CONTRACT_RENEWED = 'organization.contract_renewed';
+    case ORGANIZATION_CONTRACT_ACTIVATED = 'organization.contract_activated';
+    case ORGANIZATION_MEMBERSHIPS_RESTORED = 'organization.memberships_restored';
+    case ORGANIZATION_CONTRACT_EXPIRED = 'organization.contract_expired';
+    case ORGANIZATION_ENTITLEMENTS_UPDATED = 'organization.entitlements_updated';
+
+    case ORGANIZATION_DOMAIN_ADDED = 'organization_domain.added';
+    case ORGANIZATION_DOMAIN_VERIFIED = 'organization_domain.verified';
+    case ORGANIZATION_DOMAIN_SET_PRIMARY = 'organization_domain.set_primary';
+    case ORGANIZATION_DOMAIN_REMOVED = 'organization_domain.removed';
+
+    case ORGANIZATION_CODE_CREATED = 'organization_code.created';
+    case ORGANIZATION_CODE_DEACTIVATED = 'organization_code.deactivated';
 
     case TENANT_ACCESS_DENIED = 'tenant.access_denied';
 }

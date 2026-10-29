@@ -6,6 +6,7 @@ use App\Organization\Console\Commands\AssignPivotRoleCommand;
 use App\Organization\Http\Middleware\EnsureOrganizationTenant;
 use App\Organization\Http\Middleware\UseCorporateUserModel;
 use App\Organization\Models\Organization;
+use App\Organization\Models\OrganizationContract;
 use App\Organization\Models\OrganizationDomain;
 use App\Organization\Models\OrganizationIdentityProvider;
 use App\Organization\Models\OrganizationInvitation;
@@ -19,8 +20,12 @@ use App\Organization\Repositories\Contracts\OrganizationAuditLogRepositoryInterf
 use App\Organization\Repositories\Contracts\OrganizationMembershipRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationRepositoryInterface;
 use App\Organization\Repositories\Contracts\OrganizationRoleAssignmentRepositoryInterface;
+use App\Organization\Repositories\Contracts\OrganizationDomainRepositoryInterface;
+use App\Organization\Repositories\Contracts\OrganizationRedemptionCodeRepositoryInterface;
 use App\Organization\Repositories\OrganizationAuditLogRepository;
+use App\Organization\Repositories\OrganizationDomainRepository;
 use App\Organization\Repositories\OrganizationMembershipRepository;
+use App\Organization\Repositories\OrganizationRedemptionCodeRepository;
 use App\Organization\Repositories\OrganizationRepository;
 use App\Organization\Repositories\OrganizationRoleAssignmentRepository;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -37,6 +42,8 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->app->bind(OrganizationRoleAssignmentRepositoryInterface::class, OrganizationRoleAssignmentRepository::class);
         $this->app->bind(OrganizationMembershipRepositoryInterface::class, OrganizationMembershipRepository::class);
         $this->app->bind(OrganizationAuditLogRepositoryInterface::class, OrganizationAuditLogRepository::class);
+        $this->app->bind(OrganizationDomainRepositoryInterface::class, OrganizationDomainRepository::class);
+        $this->app->bind(OrganizationRedemptionCodeRepositoryInterface::class, OrganizationRedemptionCodeRepository::class);
     }
 
     public function boot(): void
@@ -63,6 +70,7 @@ class OrganizationServiceProvider extends ServiceProvider
     {
         Relation::morphMap([
             'organization' => Organization::class,
+            'organization_contract' => OrganizationContract::class,
             'organization_domain' => OrganizationDomain::class,
             'organization_membership' => OrganizationMembership::class,
             'organization_role_assignment' => OrganizationRoleAssignment::class,

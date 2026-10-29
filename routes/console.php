@@ -1,9 +1,12 @@
 <?php
 
 use App\Models\Activity;
+use App\Organization\Jobs\ActivateOrganizationContracts;
+use App\Organization\Jobs\ExpireOrganizationContracts;
 use App\Support\InstructionFormatter;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -29,7 +32,7 @@ Artisan::command('activities:normalize-instructions', function () {
     $this->info("Normalized instructions for {$updated} activities.");
 })->purpose('Normalize activities instruction text format and fix common key/format issues.');
 
-use Illuminate\Support\Facades\Schedule;
-
 // Automatically purge app analytics logs older than 30 days every day
 Schedule::command('app:purge-old-usage-logs')->daily();
+Schedule::job(new ExpireOrganizationContracts)->daily();
+Schedule::job(new ActivateOrganizationContracts)->daily();

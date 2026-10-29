@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Organization extends Model
@@ -62,6 +63,16 @@ class Organization extends Model
     public function domains(): HasMany
     {
         return $this->hasMany(OrganizationDomain::class);
+    }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(OrganizationContract::class);
+    }
+
+    public function currentContract(): HasOne
+    {
+        return $this->hasOne(OrganizationContract::class)->latestOfMany();
     }
 
     public function memberships(): HasMany

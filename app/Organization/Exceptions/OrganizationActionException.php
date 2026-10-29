@@ -29,4 +29,29 @@ class OrganizationActionException extends HttpException
     {
         return new self(409, "An organization with status '{$current->value}' cannot be {$action}.");
     }
+
+    public static function domainAlreadyVerified(): self
+    {
+        return new self(409, 'This domain has already been verified.');
+    }
+
+    public static function domainVerificationFailed(): self
+    {
+        return new self(422, 'The domain DNS verification record was not found or did not match.');
+    }
+
+    public static function domainVerifiedByAnotherOrganization(): self
+    {
+        return new self(409, 'This domain is already verified by another organization.');
+    }
+
+    public static function domainMustBeVerified(): self
+    {
+        return new self(409, 'Verify the domain before setting it as primary.');
+    }
+
+    public static function codeAlreadyInactive(): self
+    {
+        return new self(409, 'This redemption code is already inactive.');
+    }
 }

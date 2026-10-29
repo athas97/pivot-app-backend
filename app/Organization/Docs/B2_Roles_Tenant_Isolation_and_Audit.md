@@ -363,7 +363,7 @@ $this->audit->record(
 | Column | Filled from |
 |---|---|
 | `organization_id` | `organization` argument |
-| `actor_user_id` | `actor`, else the authenticated `User`, else `NULL` |
+| `actor_user_id` | `actor`, else the authenticated `User`, else `NULL`. With `actorType: SYSTEM` (scheduled jobs, B3) the authenticated user is never used. |
 | `actor_type` | Explicit `actorType`, else `system` (no actor), `pivot_staff` (actor has a Pivot role) or `user` |
 | `action` | `AuditAction` enum value |
 | `target_type` / `target_id` | Model morph alias and key (see morph map below) |
